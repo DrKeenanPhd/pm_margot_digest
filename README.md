@@ -1,76 +1,60 @@
 # Effortless AI — Property Manager's Instant Response (Daily Call Digest)
 
-A mobile-friendly page that lists **today's calls** for the property-manager Voice AI
-agent (Margot), sorted newest-first, filterable by priority, with tap-to-call, recording,
-and transcript. Designed to be linked from the daily digest SMS. (Repo: `pm_margot_digest`.)
+Mobile-friendly page listing **today's calls** for the property-manager Voice AI
+agent (Margot). Property-keyed entries, priority (P1–P4) or status (S1–S4) badges,
+tap-to-open distilled notification + transcript, inline recording, tap-to-call, and
+"mark handled" that drops an entry from the active board. (Repo: `pm_margot_digest`.)
 
-It is a tiny Node/Express service: it holds your GHL **Private Integration Token (PIT)**
-server-side (never in the page), calls GHL's Voice AI Call Log API, and serves the page.
+## Deploy (GitHub → Railway)
 
----
+1. Push these files to the repo root (so `package.json` and `public/` are at top level).
+2. Railway → Deploy from GitHub repo → `pm_margot_digest`. It runs `npm start`.
+3. Add Variables (from `.env.example`):
+   - `GHL_PIT` — Private Integration Token from Margot's sub-account
+   - `GHL_LOCATION_ID` — Margot's location id
+   - `DIGEST_TZ` — `America/Los_Angeles`
+   - `AGENT_ID` — `6a0e385e321d30067d28477a` (scopes the digest to Margot only)
+   - `DATA_DIR` — `/data` if you mount a Volume (see "Mark handled" below)
+   - Do NOT set `PORT` (Railway injects it).
+4. Settings → Networking → Generate Domain. Link that URL in the daily digest SMS.
 
-## 1. Create the GHL token
+## How data flows (verified from /api/debug)
 
-In the **sub-account** (location): **Settings → Private Integrations → Create New Integration**.
-Select the **Voice AI** scopes (and Conversation AI / View Location as needed). Copy the token
-(`pit-...`). Note: PITs are static and do not auto-refresh — if you rotate it, update Railway.
+- Source: `GET /voice-ai/dashboard/call-logs` (newest 100, filtered in code to
+  today-in-`DIGEST_TZ` and `agentId === AGENT_ID`).
+- Fields read from each call's `extractedData` (case-normalized): `address`,
+  `priorityLevel`, `priorityReason`, `status_level`, `callType`, `CallerState`,
+  `incidentSummary`, `CallOutcome`, `jobName`, `callerSelfIdentifiedAs`,
+  `photoRequested`, plus top-level `summary` and `transcript`.
+- Recording: streamed via `/api/recording/:messageId` →
+  `GET /conversations/messages/{messageId}/locations/{locationId}/recording`.
+  Token stays server-side.
 
-You also need the **Location ID** of that sub-account (Settings → Business Profile, or the
-location id in the URL).
+## Badges
 
-## 2. Push to GitHub
+- Client calls carry **priority** P1–P4 (red / orange / yellow / green).
+- Internal/worker calls carry **status** S1–S4 (red / purple / blue / green).
+- A card shows whichever field is populated; "Unclassified" when neither.
 
-```
-git init && git add . && git commit -m "call digest"
-git branch -M main
-git remote add origin <your-repo-url>
-git push -u origin main
-```
+## Mark handled
 
-The `.gitignore` keeps `node_modules` and any `.env` out of the repo. **Never commit the token.**
-
-## 3. Deploy on Railway
-
-- New Project → Deploy from GitHub repo → pick this repo.
-- Railway auto-detects Node and runs `npm start`.
-- Add **Variables** (from `.env.example`):
-  - `GHL_PIT` = your token
-  - `GHL_LOCATION_ID` = the sub-account id
-  - `DIGEST_TZ` = `America/Los_Angeles` (US Pacific — the sub-account timezone)
-- Railway gives you a public URL, e.g. `https://your-app.up.railway.app`.
-
-## 4. CONFIRM THE FIELD MAPPING (important — do this once)
-
-The endpoint and auth are confirmed from GHL's docs, but the exact **query-param names**
-and **response field names** were not extractable from the docs, so they are marked
-"verify" in `server.js`. Don't trust the guesses — read the real data:
-
-1. Open `https://your-app.up.railway.app/api/debug`
-   (returns a small raw sample from GHL, with your location id redacted).
-2. Send me that JSON. I'll lock down the param names and the `mapCall()` field paths
-   to match exactly, then we re-verify `/api/today`.
-
-This is the one step that turns the scaffold into a correct, production build.
-
-## 5. Wire it into the digest SMS
-
-Link to the root URL (`https://your-app.up.railway.app/`). The page always shows the
-current day in `DIGEST_TZ`, so one static link works every day.
-
----
+"Mark handled" POSTs to `/api/resolve` and stores the call id in
+`DATA_DIR/resolved.json`. Handled calls drop from the board (and would drop from a
+daily report); "Show handled" reveals them. **For persistence across redeploys,
+mount a Railway Volume and point `DATA_DIR` at it (e.g. `/data`)** — otherwise the
+list resets on each deploy. (This is page-side resolve; syncing to GHL's
+"Reply DONE" flow is a later upgrade.)
 
 ## Endpoints
 
-- `/` — the mobile page
-- `/api/today` — today's calls, mapped + sorted newest-first
-- `/api/debug` — raw GHL sample (for the mapping step above)
-- `/api/call/:id` — single call detail / transcript
-- `/healthz` — health check
+- `/` page · `/api/today` · `/api/debug` (raw sample) ·
+  `/api/recording/:messageId` · `POST /api/resolve` · `/healthz`
 
-## Notes / open items
+## Open items to verify with live data
 
-- Multi-tenant resale: the same service can serve multiple sub-accounts later by scoping
-  per location; v1 is single-location for correctness first.
-- "Recording" links to GHL's native recording URL from the API; the `aialive.app` links in
-  the marketing mockups are not needed unless you want your own short-link layer.
-- Transcript retrieval uses the per-call detail endpoint; field path confirmed in step 4.
+- **Status key:** no worker/status call was in the debug sample, so the exact
+  `extractedData` key for status is matched flexibly (`statusLevel` / `status_level`).
+  Confirm the S badge appears on the first real status call.
+- **Recording:** endpoint is confirmed in docs; verify audio actually returns on the
+  first tap (recording must be enabled on the number).
+- **S4 color:** green is a chosen default (your action defined colors only for S1–S3).

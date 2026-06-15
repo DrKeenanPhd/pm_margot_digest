@@ -1,3 +1,8 @@
+/* VERSION: v1.1.0  (2026-06-15)
+   CHANGELOG:
+   - v1.1.0  Add/remove "Handled" tag on contact when marking handled; pass contactId.
+   - v1.0.0  Agent-filtered today's calls, P/S mapping, recording proxy, page-side resolve.
+*/
 /* ------------------------------------------------------------------
    Effortless AI — Property Manager's Instant Response
    Daily Call Digest backend (Margot)
@@ -86,6 +91,7 @@ function mapCall(c, resolved) {
     null;
   return {
     id: c.id,
+    contactId: c.contactId || null,
     messageId: c.messageId || null,
     time: c.createdAt || null,
     duration: c.duration || 0,
@@ -178,15 +184,32 @@ app.get("/api/recording/:messageId", async (req, res) => {
   } catch (e) { res.status(500).json({ error: String(e) }); }
 });
 
-// Mark handled / un-handle
-app.post("/api/resolve", (req, res) => {
-  const { id, resolved = true } = req.body || {};
+// Add/remove the "Handled" tag on the contact (best-effort: never blocks resolve)
+const HANDLED_TAG = process.env.HANDLED_TAG || "Handled";
+async function setHandledTag(contactId, add) {
+  if (!contactId) return { tagged: false, reason: "no contactId" };
+  try {
+    const r = await fetch(`${GHL_BASE}/contacts/${encodeURIComponent(contactId)}/tags`, {
+      method: add ? "POST" : "DELETE",
+      headers: { ...ghlHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ tags: [HANDLED_TAG] }),
+    });
+    return { tagged: r.ok, status: r.status };
+  } catch (e) {
+    return { tagged: false, error: String(e) };
+  }
+}
+
+// Mark handled / un-handle  (page-side store + "Handled" tag on the contact)
+app.post("/api/resolve", async (req, res) => {
+  const { id, contactId, resolved = true } = req.body || {};
   if (!id) return res.status(400).json({ error: "id required" });
   const store = readResolved();
-  if (resolved) store[id] = { at: new Date().toISOString() };
+  if (resolved) store[id] = { at: new Date().toISOString(), contactId: contactId || null };
   else delete store[id];
   const ok = writeResolved(store);
-  res.json({ ok, id, resolved });
+  const tag = await setHandledTag(contactId, resolved); // add on handle, remove on un-handle
+  res.json({ ok, id, resolved, tag });
 });
 
 app.get("/", (_q, res) => res.sendFile(path.join(__dirname, "index.html")));

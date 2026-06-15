@@ -1,0 +1,15 @@
+{
+  "name": "pm_margot_digest",
+  "version": "1.0.0",
+  "description": "Call summaries for the demo and first property manager instant response tool (Margot)",
+  "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

@@ -136,15 +136,27 @@ app.get("/api/debug", async (_q, res) => {
 app.get("/api/today", async (_q, res) => {
   if (!PIT || !LOCATION_ID) return res.status(500).json({ error: "Missing GHL_PIT or GHL_LOCATION_ID." });
   try {
-    const url = new URL(GHL_BASE + "/voice-ai/dashboard/call-logs");
-    url.searchParams.set("locationId", LOCATION_ID);
-    url.searchParams.set("pageSize", "100"); // newest-first; we filter to today + agent in code
-    const r = await fetch(url, { headers: ghlHeaders() });
-    if (!r.ok) return res.status(r.status).json({ error: "GHL request failed", status: r.status, detail: await r.text() });
-    const data = await r.json();
     const today = ymd(new Date(), TZ);
+    const PAGE_SIZE = 50;   // endpoint hard max
+    const MAX_PAGES = 6;    // safety cap (≤300 most-recent calls)
+    let raw = [];
+    for (let page = 1; page <= MAX_PAGES; page++) {
+      const url = new URL(GHL_BASE + "/voice-ai/dashboard/call-logs");
+      url.searchParams.set("locationId", LOCATION_ID);
+      url.searchParams.set("pageSize", String(PAGE_SIZE));
+      url.searchParams.set("page", String(page));
+      const r = await fetch(url, { headers: ghlHeaders() });
+      if (!r.ok) return res.status(r.status).json({ error: "GHL request failed", status: r.status, detail: await r.text() });
+      const data = await r.json();
+      const logs = data.callLogs || [];
+      raw.push(...logs);
+      // results are newest-first; stop once the oldest on this page predates today
+      const oldest = logs[logs.length - 1];
+      if (logs.length < PAGE_SIZE) break;
+      if (oldest && oldest.createdAt && ymd(new Date(oldest.createdAt), TZ) < today) break;
+    }
     const resolved = readResolved();
-    const calls = (data.callLogs || [])
+    const calls = raw
       .filter((c) => c.agentId === AGENT_ID)
       .filter((c) => c.createdAt && ymd(new Date(c.createdAt), TZ) === today)
       .map((c) => mapCall(c, resolved))

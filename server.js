@@ -177,5 +177,5 @@ app.post("/api/resolve", (req, res) => {
   res.json({ ok, id, resolved });
 });
 
-app.use(express.static(path.join(__dirname, "public")));
+app.get("/", (_q, res) => res.sendFile(path.join(__dirname, "index.html")));
 app.listen(PORT, () => console.log(`Call digest running on :${PORT} (tz ${TZ}, agent ${AGENT_ID})`));

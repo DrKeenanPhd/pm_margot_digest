@@ -1,93 +1,112 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<!-- VERSION: v1.2.0 (2026-06-15)
+     CHANGELOG:
+     - v1.2.0  Re-skin to match EffortlessAI brand (white, electric blue, green, Archivo, wordmark).
+     - v1.1.0  Branded notification-format detail sheet (SMS layout, caller-state emoji,
+               Map link, OK/DONE/ESC lines), "Powered by AI Alive" footer, contactId for tagging.
+     - v1.0.0  Property-headline cards, P/S badges, tap-to-open sheet, recording, mark-handled. -->
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Effortless AI — Property Manager's Instant Response</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
 <style>
   :root{
-    --bg:#f3f1ec; --ink:#15140f; --muted:#6b675d; --card:#26262a; --line:rgba(255,255,255,.08); --accent:#991b1b;
-    --p1:#e5484d; --p2:#f5820b; --p3:#e3b40a; --p4:#2faa55;
-    --s1:#e5484d; --s2:#8b3fd6; --s3:#2f6fed; --s4:#2faa55;
+    --bg:#ffffff; --band:#f4f7fb; --ink:#0e1626; --muted:#5a6573; --line:#e6e9ef;
+    --brand:#2a64f6; --green:#16a34a;
+    --p1:#e5484d; --p2:#f5820b; --p3:#e3b40a; --p4:#22a85a;
+    --s1:#e5484d; --s2:#8b3fd6; --s3:#2f6fed; --s4:#22a85a;
+    --notif:#1b2130;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;padding:0}
-  body{background:var(--bg);color:var(--ink);font-family:"Public Sans",system-ui,sans-serif;
+  body{background:var(--bg);color:var(--ink);font-family:"Archivo",system-ui,sans-serif;
     padding:env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 48px);-webkit-font-smoothing:antialiased}
   .wrap{max-width:600px;margin:0 auto;padding:0 16px}
-  header{padding:24px 0 10px}
-  .kicker{font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:700}
-  h1{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:2rem;line-height:1.02;margin:4px 0 2px;letter-spacing:-.02em}
-  .datemeta{color:var(--muted);font-size:.9rem}
 
-  .controls{position:sticky;top:0;z-index:5;background:linear-gradient(var(--bg) 74%,rgba(243,241,236,0));padding:10px 0 12px}
+  header{padding:20px 0 8px}
+  .brand{font-weight:900;font-size:1.4rem;letter-spacing:-.02em}
+  .brand .ai{color:var(--green)}
+  .kicker{display:inline-block;margin:14px 0 8px;background:rgba(42,100,246,.10);color:var(--brand);
+    font-size:.66rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;padding:6px 12px;border-radius:999px}
+  h1{font-weight:900;font-size:2.15rem;line-height:1;margin:0 0 4px;letter-spacing:-.03em}
+  .datemeta{color:var(--muted);font-size:.92rem;font-weight:500}
+
+  .controls{position:sticky;top:0;z-index:5;background:linear-gradient(var(--bg) 76%,rgba(255,255,255,0));padding:12px 0}
   .chips{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
   .chips::-webkit-scrollbar{display:none}
-  .chip{flex:0 0 auto;border:1.5px solid #d8d4ca;background:#fff;color:var(--ink);font-weight:700;font-size:.8rem;padding:7px 12px;border-radius:999px;cursor:pointer;transition:.15s;white-space:nowrap}
-  .chip[data-active="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .chip{flex:0 0 auto;border:1.5px solid var(--line);background:#fff;color:var(--ink);font-weight:700;font-size:.8rem;padding:7px 13px;border-radius:999px;cursor:pointer;transition:.15s;white-space:nowrap}
+  .chip[data-active="true"]{background:var(--brand);color:#fff;border-color:var(--brand)}
   .chip .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
-  .sep{flex:0 0 auto;width:1px;background:#d8d4ca;margin:4px 3px}
+  .sep{flex:0 0 auto;width:1px;background:var(--line);margin:4px 3px}
   .sortrow{display:flex;justify-content:space-between;align-items:center;margin-top:11px;gap:10px}
   .count{font-size:.85rem;color:var(--muted);font-weight:600}
   .rightctl{display:flex;align-items:center;gap:14px}
-  .togglebtn,.sortbtn{border:none;background:none;font:inherit;font-weight:700;font-size:.82rem;cursor:pointer;color:var(--accent);display:flex;align-items:center;gap:5px}
+  .togglebtn,.sortbtn{border:none;background:none;font:inherit;font-weight:700;font-size:.82rem;cursor:pointer;color:var(--brand);display:flex;align-items:center;gap:5px}
   .togglebtn{color:var(--muted)}
   .togglebtn[data-on="true"]{color:var(--ink)}
 
   .list{display:flex;flex-direction:column;gap:12px;margin-top:6px}
-  .card{background:var(--card);color:#fff;border-radius:16px;overflow:hidden;box-shadow:0 6px 18px rgba(0,0,0,.10);border:1px solid var(--line);transition:.2s}
-  .card.resolved{opacity:.55}
-  .card .bar{height:4px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(14,22,38,.06);transition:.2s}
+  .card.resolved{opacity:.5}
+  .card .bar{height:5px}
   .card .body{padding:14px 15px 15px}
-  .row1{display:flex;align-items:center;gap:7px;margin-bottom:7px;flex-wrap:wrap}
-  .badge{font-weight:800;font-size:.7rem;letter-spacing:.03em;padding:4px 8px;border-radius:7px;color:#fff}
-  .badge.unc{background:#55555c}
-  .pill{font-size:.64rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 7px;border-radius:6px;background:rgba(255,255,255,.12);color:#cfccc4}
-  .time{margin-left:auto;font-size:.76rem;color:#b8b5ad;font-variant-numeric:tabular-nums}
-  .prop{font-family:"Bricolage Grotesque",sans-serif;font-weight:700;font-size:1.16rem;letter-spacing:-.01em;line-height:1.15}
-  .who{color:#c9c6be;font-size:.86rem;margin-top:2px}
-  .line{color:#d6d3cb;font-size:.92rem;line-height:1.4;margin:8px 0 12px}
+  .row1{display:flex;align-items:center;gap:7px;margin-bottom:8px;flex-wrap:wrap}
+  .badge{font-weight:800;font-size:.7rem;letter-spacing:.03em;padding:4px 9px;border-radius:7px;color:#fff}
+  .badge.unc{background:#8a93a3}
+  .pill{font-size:.64rem;font-weight:800;letter-spacing:.03em;text-transform:uppercase;padding:3px 8px;border-radius:6px;background:#eef1f6;color:#5a6573}
+  .time{margin-left:auto;font-size:.78rem;color:#9aa3b1;font-weight:600;font-variant-numeric:tabular-nums}
+  .prop{font-weight:800;font-size:1.18rem;letter-spacing:-.01em;line-height:1.12}
+  .who{color:var(--muted);font-size:.87rem;margin-top:2px;font-weight:500}
+  .line{color:#3a4452;font-size:.93rem;line-height:1.4;margin:8px 0 13px}
   .actions{display:flex;gap:8px;flex-wrap:wrap}
-  .act{flex:1 1 auto;text-align:center;text-decoration:none;font-weight:700;font-size:.84rem;padding:10px 8px;border-radius:10px;min-width:84px;border:none;cursor:pointer}
-  .act.call{background:#fff;color:#15140f}
-  .act.rec{background:#33333a;color:#fff;border:1px solid var(--line)}
-  .act.done{background:#1f3d2a;color:#bff0cf;border:1px solid rgba(255,255,255,.08)}
-  .act.done[data-done="true"]{background:#2faa55;color:#08210f}
+  .act{flex:1 1 auto;text-align:center;text-decoration:none;font-weight:800;font-size:.84rem;padding:11px 8px;border-radius:11px;min-width:84px;border:none;cursor:pointer}
+  .act.call{background:var(--brand);color:#fff}
+  .act.rec{background:#fff;color:var(--ink);border:1.5px solid var(--line)}
+  .act.done{background:#eafaf0;color:#128a43;border:1.5px solid #c4ecd2}
+  .act.done[data-done="true"]{background:var(--green);color:#fff;border-color:var(--green)}
   .audio{margin-top:10px;width:100%}
   .audio audio{width:100%;height:38px}
 
   .empty,.err{text-align:center;color:var(--muted);padding:46px 16px}
-  .err{color:#9b2c2c}
-  .skeleton{height:120px;border-radius:16px;background:linear-gradient(100deg,#e7e3da 30%,#efece4 50%,#e7e3da 70%);background-size:200% 100%;animation:sh 1.2s infinite}
+  .err{color:#c0362f}
+  .skeleton{height:120px;border-radius:16px;background:linear-gradient(100deg,#eef1f6 30%,#f6f8fb 50%,#eef1f6 70%);background-size:200% 100%;animation:sh 1.2s infinite;border:1px solid var(--line)}
   @keyframes sh{to{background-position:-200% 0}}
 
-  .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:.2s;z-index:20}
+  .sheet-bg{position:fixed;inset:0;background:rgba(14,22,38,.42);opacity:0;pointer-events:none;transition:.2s;z-index:20}
   .sheet-bg.open{opacity:1;pointer-events:auto}
-  .sheet{position:fixed;left:0;right:0;bottom:0;max-height:88vh;background:var(--bg);border-radius:20px 20px 0 0;transform:translateY(100%);transition:.25s cubic-bezier(.2,.8,.2,1);z-index:21;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom)}
+  .sheet{position:fixed;left:0;right:0;bottom:0;max-height:88vh;background:#fff;border-radius:20px 20px 0 0;transform:translateY(100%);transition:.25s cubic-bezier(.2,.8,.2,1);z-index:21;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -8px 40px rgba(14,22,38,.18)}
   .sheet.open{transform:translateY(0)}
-  .sheet .top{display:flex;align-items:flex-start;justify-content:space-between;padding:16px 18px 12px;border-bottom:1px solid #ddd8cd;gap:10px}
-  .sheet .top h3{font-family:"Bricolage Grotesque",sans-serif;margin:0;font-size:1.2rem;line-height:1.1}
-  .sheet .top .sub{color:var(--muted);font-size:.84rem;margin-top:3px}
-  .sheet .x{border:none;background:#e4e0d6;width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer;flex:0 0 auto}
+  .sheet .top{display:flex;align-items:flex-start;justify-content:space-between;padding:16px 18px 12px;border-bottom:1px solid var(--line);gap:10px}
+  .sheet .top h3{font-weight:800;margin:0;font-size:1.2rem;line-height:1.1;letter-spacing:-.01em}
+  .sheet .top .sub{color:var(--muted);font-size:.84rem;margin-top:3px;font-weight:500}
+  .sheet .x{border:none;background:#eef1f6;width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer;flex:0 0 auto;color:var(--ink)}
   .sheet .content{overflow-y:auto;padding:14px 18px 24px}
-  .kv{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid #e6e1d7;font-size:.92rem}
-  .kv .k{flex:0 0 116px;color:var(--muted);font-weight:600}
-  .kv .v{flex:1;color:var(--ink)}
-  .scriptlbl{font-weight:700;margin:16px 0 6px;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-  .script{white-space:pre-wrap;line-height:1.5;font-size:.9rem;background:#ece8df;border-radius:12px;padding:12px 14px;max-height:38vh;overflow-y:auto}
+  .scriptlbl{font-weight:800;margin:16px 0 6px;font-size:.74rem;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+  .script{white-space:pre-wrap;line-height:1.55;font-size:.9rem;background:var(--band);border-radius:12px;padding:12px 14px;max-height:38vh;overflow-y:auto;color:#2a3340}
   .sheetact{display:flex;gap:8px;margin-top:14px}
-  .sheetact .act{color:#fff}
-  .sheetact .act.call{background:var(--ink)}
-  .sheetact .act.done{background:#23643a;color:#fff}
+  .sheetact .act.call{background:var(--brand);color:#fff}
+  .sheetact .act.rec{background:#fff;border:1.5px solid var(--line);color:var(--ink)}
+  .sheetact .act.done{background:var(--green);color:#fff}
+
+  .notif{background:var(--notif);color:#eef1f6;border-radius:14px;padding:14px 15px;font-size:.95rem;line-height:1.5}
+  .notif .nh{font-weight:800;font-size:1rem;margin-bottom:6px;line-height:1.25}
+  .notif a{color:#8fb4ff;text-decoration:none}
+  .notif .meta{color:#aab2c2;font-size:.84rem;margin-top:8px}
+  .notif .reply{margin-top:10px;padding-top:9px;border-top:1px solid rgba(255,255,255,.12);font-size:.82rem;color:#cdd3df}
+  .notif .reply b{color:#fff}
+  .brandfoot{text-align:center;color:var(--muted);font-size:.78rem;padding:26px 0 6px;font-weight:500}
+  .brandfoot b{color:var(--ink)}
 </style>
 </head>
 <body>
   <div class="wrap">
     <header>
-      <div class="kicker">Effortless AI · Property Manager's Instant Response</div>
+      <div class="brand">Effortless<span class="ai">AI</span></div>
+      <div class="kicker">Property Manager's Instant Response</div>
       <h1>Today's Calls</h1>
       <div class="datemeta" id="datemeta">Loading…</div>
     </header>
@@ -117,6 +136,7 @@
     <div class="list" id="list">
       <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
     </div>
+    <div class="brandfoot">Powered by <b>AI Alive</b></div>
   </div>
 
   <div class="sheet-bg" id="sheetbg"></div>
@@ -131,6 +151,11 @@
 <script>
   const PRI={P1:{c:"--p1",t:"P1 · CRITICAL"},P2:{c:"--p2",t:"P2 · URGENT"},P3:{c:"--p3",t:"P3 · HIGH"},P4:{c:"--p4",t:"P4 · STANDARD"}};
   const STA={S1:{c:"--s1",t:"S1 · URGENT"},S2:{c:"--s2",t:"S2 · ASAP"},S3:{c:"--s3",t:"S3 · WORKING"},S4:{c:"--s4",t:"S4 · COMPLETE"}};
+  const PDOT={P1:"🔴",P2:"🟠",P3:"🟡",P4:"🟢"};
+  const SDOT={S1:"🔴",S2:"🟣",S3:"🔵",S4:"🟢"};
+  const PFULL={P1:"CRITICAL",P2:"URGENT",P3:"HIGH PRIORITY",P4:"STANDARD"};
+  const SFULL={S1:"URGENT",S2:"NEEDS ATTENTION",S3:"WORKING / ON-SITE",S4:"COMPLETE"};
+  const STATE={Calm:"🟢",Urgent:"🟠",Distressed:"🔴",Agro:"⚡"};
   let calls=[],filter="all",desc=true,showHandled=false;
 
   const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
@@ -169,7 +194,7 @@
         <div class="bar" style="background:${barColor(c)}"></div>
         <div class="body">
           <div class="row1">${badgesHTML(c)}
-            ${c.callerState&&c.callerState!=='Calm'?`<span class="pill">${esc(c.callerState)}</span>`:''}
+            ${c.callerState&&c.callerState!=='Calm'?`<span class="pill">${STATE[c.callerState]||''} ${esc(c.callerState)}</span>`:''}
             <span class="time">${fmtTime(c.time)}</span></div>
           <div class="prop" data-open="${i}">${esc(head)}</div>
           ${sub?`<div class="who" data-open="${i}">${sub}</div>`:''}
@@ -197,7 +222,7 @@
 
   async function toggleDone(c){
     const next=!c.resolved;c.resolved=next;render();
-    try{await fetch("/api/resolve",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:c.id,resolved:next})});}
+    try{await fetch("/api/resolve",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:c.id,contactId:c.contactId,resolved:next})});}
     catch(e){c.resolved=!next;render();}
   }
 
@@ -207,31 +232,46 @@
     document.getElementById("shTitle").textContent=c.property||c.name||"Call details";
     document.getElementById("shSub").textContent=[c.name&&c.property?c.name:null,c.city,fmtTime(c.time)].filter(Boolean).join(" · ");
     const internal=(c.callType==='internal')||!!c.status;
-    let rows=`<div class="row1" style="margin-bottom:10px">${badgesHTML(c)}${c.callerState&&c.callerState!=='Calm'?`<span class="pill" style="background:#e6e1d7;color:#6b675d">${esc(c.callerState)}</span>`:''}</div>`;
-    if(internal){
-      rows+=kv("Status",STA[key(c.status)]?STA[key(c.status)].t:c.status)
-        +kv("Reporter",c.identifiedAs||c.name)
-        +kv("Property",c.property)
-        +kv("Update",c.incident||c.summary)
-        +kv("Outcome",c.outcome)
-        +kv("Job",c.jobName);
-    }else{
-      rows+=kv("Priority",PRI[key(c.priority)]?PRI[key(c.priority)].t:(c.priority||"Unclassified"))
-        +kv("Why",c.priorityReason)
-        +kv("Caller",c.name)
-        +kv("They are",c.identifiedAs||c.callerType)
-        +kv("Property",c.property)
-        +kv("Summary",c.incident||c.summary)
-        +kv("Outcome",c.outcome)
-        +kv("Photo asked",c.photoRequested==='yes'?'Yes':null);
-    }
+    const pk=key(c.priority),sk=key(c.status);
     const phone=(c.phone||"").replace(/[^0-9+]/g,"");
-    rows+=`<div class="sheetact">
+    const issue=c.incident||c.summary||c.outcome||"";
+    const mapQ=c.property?encodeURIComponent([c.property,c.city,c.state].filter(Boolean).join(" ")):"";
+    const stateLine=c.callerState?`${STATE[c.callerState]||''} Caller ${esc(c.callerState.toLowerCase())}`:"";
+
+    let head, reply, whoLine;
+    if(internal){
+      head=`${SDOT[sk]||'⚪'} STATUS ${sk||''} — ${SFULL[sk]||esc(c.status||'')} — ${esc(c.property||c.name||'')}`;
+      whoLine=`${esc(c.name||'')}${c.identifiedAs?` (${esc(c.identifiedAs)})`:''}${issue?`: ${esc(issue)}`:''}`;
+      reply=`Reply <b>OK</b> to acknowledge · <b>WAIT / RESCHED / NEXT</b> to direct`;
+    }else{
+      head=`${PDOT[pk]||'⚪'} ${pk?pk+' ':''}${PFULL[pk]||'UNCLASSIFIED'} — ${esc(c.property||c.name||'')}`;
+      whoLine=`${esc(c.name||'')}${issue?`: ${esc(issue)}`:''}`;
+      reply=`Reply <b>OK</b> to acknowledge · <b>DONE</b> when resolved · <b>ESC</b> to escalate`;
+    }
+    const links=[
+      c.hasRecording?`<a href="/api/recording/${encodeURIComponent(c.messageId)}" target="_blank" rel="noopener">▶️ Recording</a>`:'',
+      mapQ?`<a href="https://maps.google.com/?q=${mapQ}" target="_blank" rel="noopener">📍 Map</a>`:''
+    ].filter(Boolean).join(" · ");
+
+    let notif=`<div class="notif">
+      <div class="nh">${head}</div>
+      <div>${whoLine}</div>
+      ${phone?`<div>Call or text: <a href="tel:${phone}">${esc(c.phone)}</a> · Press &amp; Hold to Forward</div>`:''}
+      ${(c.priorityReason&&!internal)?`<div class="meta">${esc(c.priorityReason)}</div>`:''}
+      ${stateLine?`<div class="meta">${stateLine}</div>`:''}
+      ${links?`<div class="meta">${links}</div>`:''}
+      ${(c.photoRequested==='yes')?`<div class="meta">📷 Photo requested</div>`:''}
+      <div class="reply">${reply}</div>
+    </div>`;
+
+    let controls=`<div class="sheetact">
       ${phone?`<a class="act call" href="tel:${phone}">Call back</a>`:''}
       ${c.hasRecording?`<a class="act rec" href="/api/recording/${encodeURIComponent(c.messageId)}" target="_blank" rel="noopener">▶ Recording</a>`:''}
       <button class="act done" id="shDone">${c.resolved?'Handled ✓':'Mark handled'}</button></div>`;
-    if(c.transcript){rows+=`<div class="scriptlbl">Transcript</div><div class="script">${esc(c.transcript)}</div>`;}
-    document.getElementById("shContent").innerHTML=rows;
+
+    let script=c.transcript?`<div class="scriptlbl">Transcript</div><div class="script">${esc(c.transcript)}</div>`:"";
+
+    document.getElementById("shContent").innerHTML=notif+controls+script;
     const sd=document.getElementById("shDone");
     if(sd)sd.addEventListener("click",()=>{toggleDone(c);sd.textContent=c.resolved?'Handled ✓':'Mark handled';});
     bg.classList.add("open");sh.classList.add("open");

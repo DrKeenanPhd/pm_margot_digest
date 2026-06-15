@@ -8,72 +8,80 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet" />
 <style>
-  :root {
-    --bg: #f3f1ec;
-    --ink: #15140f;
-    --muted: #6b675d;
-    --card: #26262a;
-    --card-2: #1d1d20;
-    --line: rgba(255,255,255,.08);
-    --p1: #e5484d; --p2: #f5820b; --p3: #e3b40a; --p4: #2faa55;
-    --accent: #991b1b;
+  :root{
+    --bg:#f3f1ec; --ink:#15140f; --muted:#6b675d; --card:#26262a; --line:rgba(255,255,255,.08); --accent:#991b1b;
+    --p1:#e5484d; --p2:#f5820b; --p3:#e3b40a; --p4:#2faa55;
+    --s1:#e5484d; --s2:#8b3fd6; --s3:#2f6fed; --s4:#2faa55;
   }
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; padding: 0; }
-  body {
-    background: var(--bg);
-    color: var(--ink);
-    font-family: "Public Sans", system-ui, sans-serif;
-    padding: env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 40px);
-    -webkit-font-smoothing: antialiased;
-  }
-  .wrap { max-width: 560px; margin: 0 auto; padding: 0 16px; }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:"Public Sans",system-ui,sans-serif;
+    padding:env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 48px);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:600px;margin:0 auto;padding:0 16px}
+  header{padding:24px 0 10px}
+  .kicker{font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:700}
+  h1{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:2rem;line-height:1.02;margin:4px 0 2px;letter-spacing:-.02em}
+  .datemeta{color:var(--muted);font-size:.9rem}
 
-  header { padding: 26px 0 14px; }
-  .kicker { font-size: .72rem; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
-  h1 { font-family: "Bricolage Grotesque", sans-serif; font-weight: 800; font-size: 2.1rem; line-height: 1.02; margin: 4px 0 2px; letter-spacing: -.02em; }
-  .datemeta { color: var(--muted); font-size: .9rem; }
+  .controls{position:sticky;top:0;z-index:5;background:linear-gradient(var(--bg) 74%,rgba(243,241,236,0));padding:10px 0 12px}
+  .chips{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{flex:0 0 auto;border:1.5px solid #d8d4ca;background:#fff;color:var(--ink);font-weight:700;font-size:.8rem;padding:7px 12px;border-radius:999px;cursor:pointer;transition:.15s;white-space:nowrap}
+  .chip[data-active="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .chip .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  .sep{flex:0 0 auto;width:1px;background:#d8d4ca;margin:4px 3px}
+  .sortrow{display:flex;justify-content:space-between;align-items:center;margin-top:11px;gap:10px}
+  .count{font-size:.85rem;color:var(--muted);font-weight:600}
+  .rightctl{display:flex;align-items:center;gap:14px}
+  .togglebtn,.sortbtn{border:none;background:none;font:inherit;font-weight:700;font-size:.82rem;cursor:pointer;color:var(--accent);display:flex;align-items:center;gap:5px}
+  .togglebtn{color:var(--muted)}
+  .togglebtn[data-on="true"]{color:var(--ink)}
 
-  .controls { position: sticky; top: 0; z-index: 5; background: linear-gradient(var(--bg) 72%, rgba(243,241,236,0)); padding: 10px 0 12px; }
-  .chips { display: flex; gap: 7px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
-  .chips::-webkit-scrollbar { display: none; }
-  .chip { flex: 0 0 auto; border: 1.5px solid #d8d4ca; background: #fff; color: var(--ink); font-weight: 700; font-size: .82rem; padding: 8px 13px; border-radius: 999px; cursor: pointer; transition: .15s; }
-  .chip[data-active="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
-  .chip .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align: middle; }
-  .sortrow { display:flex; justify-content:space-between; align-items:center; margin-top:11px; }
-  .count { font-size: .85rem; color: var(--muted); font-weight: 600; }
-  .sortbtn { border:none; background:none; font: inherit; font-weight:700; font-size:.85rem; color: var(--accent); cursor:pointer; display:flex; align-items:center; gap:5px; }
+  .list{display:flex;flex-direction:column;gap:12px;margin-top:6px}
+  .card{background:var(--card);color:#fff;border-radius:16px;overflow:hidden;box-shadow:0 6px 18px rgba(0,0,0,.10);border:1px solid var(--line);transition:.2s}
+  .card.resolved{opacity:.55}
+  .card .bar{height:4px}
+  .card .body{padding:14px 15px 15px}
+  .row1{display:flex;align-items:center;gap:7px;margin-bottom:7px;flex-wrap:wrap}
+  .badge{font-weight:800;font-size:.7rem;letter-spacing:.03em;padding:4px 8px;border-radius:7px;color:#fff}
+  .badge.unc{background:#55555c}
+  .pill{font-size:.64rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 7px;border-radius:6px;background:rgba(255,255,255,.12);color:#cfccc4}
+  .time{margin-left:auto;font-size:.76rem;color:#b8b5ad;font-variant-numeric:tabular-nums}
+  .prop{font-family:"Bricolage Grotesque",sans-serif;font-weight:700;font-size:1.16rem;letter-spacing:-.01em;line-height:1.15}
+  .who{color:#c9c6be;font-size:.86rem;margin-top:2px}
+  .line{color:#d6d3cb;font-size:.92rem;line-height:1.4;margin:8px 0 12px}
+  .actions{display:flex;gap:8px;flex-wrap:wrap}
+  .act{flex:1 1 auto;text-align:center;text-decoration:none;font-weight:700;font-size:.84rem;padding:10px 8px;border-radius:10px;min-width:84px;border:none;cursor:pointer}
+  .act.call{background:#fff;color:#15140f}
+  .act.rec{background:#33333a;color:#fff;border:1px solid var(--line)}
+  .act.done{background:#1f3d2a;color:#bff0cf;border:1px solid rgba(255,255,255,.08)}
+  .act.done[data-done="true"]{background:#2faa55;color:#08210f}
+  .audio{margin-top:10px;width:100%}
+  .audio audio{width:100%;height:38px}
 
-  .list { display: flex; flex-direction: column; gap: 12px; margin-top: 6px; }
-  .card { background: var(--card); color:#fff; border-radius: 16px; overflow:hidden; box-shadow: 0 6px 18px rgba(0,0,0,.10); border: 1px solid var(--line); }
-  .card .bar { height: 4px; }
-  .card .body { padding: 15px 16px 16px; }
-  .row1 { display:flex; align-items:center; gap:9px; margin-bottom: 8px; }
-  .badge { font-weight: 800; font-size: .74rem; letter-spacing:.04em; padding: 4px 9px; border-radius: 7px; color:#fff; }
-  .time { margin-left:auto; font-size:.78rem; color:#b8b5ad; font-variant-numeric: tabular-nums; }
-  .name { font-family:"Bricolage Grotesque",sans-serif; font-weight:700; font-size:1.12rem; letter-spacing:-.01em; }
-  .summary { color:#d6d3cb; font-size:.93rem; line-height:1.45; margin:6px 0 13px; }
-  .actions { display:flex; gap:9px; flex-wrap:wrap; }
-  .act { flex:1 1 auto; text-align:center; text-decoration:none; font-weight:700; font-size:.86rem; padding:11px 10px; border-radius:11px; min-width:96px; }
-  .act.call { background:#fff; color:#15140f; }
-  .act.rec { background:#33333a; color:#fff; border:1px solid var(--line); }
-  .act.tr { background:#33333a; color:#fff; border:1px solid var(--line); cursor:pointer; }
-  .act.disabled { opacity:.4; pointer-events:none; }
+  .empty,.err{text-align:center;color:var(--muted);padding:46px 16px}
+  .err{color:#9b2c2c}
+  .skeleton{height:120px;border-radius:16px;background:linear-gradient(100deg,#e7e3da 30%,#efece4 50%,#e7e3da 70%);background-size:200% 100%;animation:sh 1.2s infinite}
+  @keyframes sh{to{background-position:-200% 0}}
 
-  .empty, .err { text-align:center; color:var(--muted); padding:48px 16px; }
-  .err { color:#9b2c2c; }
-  .skeleton { height:118px; border-radius:16px; background:linear-gradient(100deg,#e7e3da 30%,#efece4 50%,#e7e3da 70%); background-size:200% 100%; animation:sh 1.2s infinite; }
-  @keyframes sh { to { background-position:-200% 0; } }
-
-  /* transcript sheet */
-  .sheet-bg { position:fixed; inset:0; background:rgba(0,0,0,.45); opacity:0; pointer-events:none; transition:.2s; z-index:20; }
-  .sheet-bg.open { opacity:1; pointer-events:auto; }
-  .sheet { position:fixed; left:0; right:0; bottom:0; max-height:82vh; background:var(--bg); border-radius:20px 20px 0 0; transform:translateY(100%); transition:.25s cubic-bezier(.2,.8,.2,1); z-index:21; display:flex; flex-direction:column; padding-bottom: env(safe-area-inset-bottom); }
-  .sheet.open { transform:translateY(0); }
-  .sheet h3 { font-family:"Bricolage Grotesque",sans-serif; margin:0; font-size:1.15rem; }
-  .sheet .top { display:flex; align-items:center; justify-content:space-between; padding:16px 18px 10px; border-bottom:1px solid #ddd8cd; }
-  .sheet .x { border:none; background:#e4e0d6; width:32px; height:32px; border-radius:50%; font-size:1.1rem; cursor:pointer; }
-  .sheet .content { overflow-y:auto; padding:16px 18px; white-space:pre-wrap; line-height:1.55; font-size:.95rem; }
+  .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:.2s;z-index:20}
+  .sheet-bg.open{opacity:1;pointer-events:auto}
+  .sheet{position:fixed;left:0;right:0;bottom:0;max-height:88vh;background:var(--bg);border-radius:20px 20px 0 0;transform:translateY(100%);transition:.25s cubic-bezier(.2,.8,.2,1);z-index:21;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom)}
+  .sheet.open{transform:translateY(0)}
+  .sheet .top{display:flex;align-items:flex-start;justify-content:space-between;padding:16px 18px 12px;border-bottom:1px solid #ddd8cd;gap:10px}
+  .sheet .top h3{font-family:"Bricolage Grotesque",sans-serif;margin:0;font-size:1.2rem;line-height:1.1}
+  .sheet .top .sub{color:var(--muted);font-size:.84rem;margin-top:3px}
+  .sheet .x{border:none;background:#e4e0d6;width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer;flex:0 0 auto}
+  .sheet .content{overflow-y:auto;padding:14px 18px 24px}
+  .kv{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid #e6e1d7;font-size:.92rem}
+  .kv .k{flex:0 0 116px;color:var(--muted);font-weight:600}
+  .kv .v{flex:1;color:var(--ink)}
+  .scriptlbl{font-weight:700;margin:16px 0 6px;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .script{white-space:pre-wrap;line-height:1.5;font-size:.9rem;background:#ece8df;border-radius:12px;padding:12px 14px;max-height:38vh;overflow-y:auto}
+  .sheetact{display:flex;gap:8px;margin-top:14px}
+  .sheetact .act{color:#fff}
+  .sheetact .act.call{background:var(--ink)}
+  .sheetact .act.done{background:#23643a;color:#fff}
 </style>
 </head>
 <body>
@@ -91,10 +99,18 @@
         <button class="chip" data-f="P2"><span class="dot" style="background:var(--p2)"></span>P2</button>
         <button class="chip" data-f="P3"><span class="dot" style="background:var(--p3)"></span>P3</button>
         <button class="chip" data-f="P4"><span class="dot" style="background:var(--p4)"></span>P4</button>
+        <span class="sep"></span>
+        <button class="chip" data-f="S1"><span class="dot" style="background:var(--s1)"></span>S1</button>
+        <button class="chip" data-f="S2"><span class="dot" style="background:var(--s2)"></span>S2</button>
+        <button class="chip" data-f="S3"><span class="dot" style="background:var(--s3)"></span>S3</button>
+        <button class="chip" data-f="S4"><span class="dot" style="background:var(--s4)"></span>S4</button>
       </div>
       <div class="sortrow">
         <span class="count" id="count"></span>
-        <button class="sortbtn" id="sortbtn">↓ Newest first</button>
+        <div class="rightctl">
+          <button class="togglebtn" id="togglebtn" data-on="false">Show handled</button>
+          <button class="sortbtn" id="sortbtn">↓ Newest</button>
+        </div>
       </div>
     </div>
 
@@ -105,84 +121,139 @@
 
   <div class="sheet-bg" id="sheetbg"></div>
   <div class="sheet" id="sheet">
-    <div class="top"><h3 id="sheetTitle">Transcript</h3><button class="x" id="sheetX">×</button></div>
-    <div class="content" id="sheetContent">Loading…</div>
+    <div class="top">
+      <div><h3 id="shTitle"></h3><div class="sub" id="shSub"></div></div>
+      <button class="x" id="shX">×</button>
+    </div>
+    <div class="content" id="shContent"></div>
   </div>
 
 <script>
-  const P = {
-    P1:{c:"var(--p1)",label:"P1 · CRITICAL"}, P2:{c:"var(--p2)",label:"P2 · URGENT"},
-    P3:{c:"var(--p3)",label:"P3 · HIGH"}, P4:{c:"var(--p4)",label:"P4 · STANDARD"}
-  };
-  let calls = [], filter = "all", desc = true;
+  const PRI={P1:{c:"--p1",t:"P1 · CRITICAL"},P2:{c:"--p2",t:"P2 · URGENT"},P3:{c:"--p3",t:"P3 · HIGH"},P4:{c:"--p4",t:"P4 · STANDARD"}};
+  const STA={S1:{c:"--s1",t:"S1 · URGENT"},S2:{c:"--s2",t:"S2 · ASAP"},S3:{c:"--s3",t:"S3 · WORKING"},S4:{c:"--s4",t:"S4 · COMPLETE"}};
+  let calls=[],filter="all",desc=true,showHandled=false;
 
-  const fmtTime = t => { if(!t) return ""; const d=new Date(t); return isNaN(d)?"":d.toLocaleTimeString([], {hour:"numeric",minute:"2-digit"}); };
+  const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+  const fmtTime=t=>{if(!t)return"";const d=new Date(t);return isNaN(d)?"":d.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})};
+  const key=v=>(v||"").toString().toUpperCase().slice(0,2);
+  const badgeMeta=c=>{const p=key(c.priority),s=key(c.status);
+    if(PRI[p]&&STA[s])return[PRI[p],STA[s]];
+    if(PRI[p])return[PRI[p]];
+    if(STA[s])return[STA[s]];
+    return[{c:null,t:"UNCLASSIFIED",unc:true}];};
+
+  function badgesHTML(c){
+    return badgeMeta(c).map(m=>m.unc?`<span class="badge unc">${m.t}</span>`
+      :`<span class="badge" style="background:var(${m.c})">${m.t}</span>`).join("");
+  }
+  function barColor(c){const m=badgeMeta(c)[0];return m.c?`var(${m.c})`:"#55555c";}
+
+  function visible(){
+    let rows=calls.filter(c=>showHandled?true:!c.resolved);
+    if(filter!=="all")rows=rows.filter(c=>key(c.priority)===filter||key(c.status)===filter);
+    rows.sort((a,b)=>(desc?-1:1)*((new Date(a.time||0))-(new Date(b.time||0))));
+    return rows;
+  }
 
   function render(){
-    const list = document.getElementById("list");
-    let rows = calls.filter(c => filter==="all" ? true : (c.priority||"").toUpperCase().startsWith(filter));
-    rows.sort((a,b)=> (desc?-1:1)*((new Date(a.time||0))-(new Date(b.time||0))));
-    document.getElementById("count").textContent = rows.length + (rows.length===1?" call":" calls");
-    if(!rows.length){ list.innerHTML = '<div class="empty">No calls match this filter today.</div>'; return; }
-    list.innerHTML = rows.map(c=>{
-      const pk = (c.priority||"").toUpperCase().slice(0,2);
-      const meta = P[pk] || {c:"#888",label:(c.priority||"Unclassified")};
-      const phoneDigits = (c.phone||"").replace(/[^0-9+]/g,"");
-      return `<div class="card">
-        <div class="bar" style="background:${meta.c}"></div>
+    const list=document.getElementById("list");
+    const rows=visible();
+    document.getElementById("count").textContent=rows.length+(rows.length===1?" call":" calls");
+    if(!rows.length){list.innerHTML='<div class="empty">Nothing here right now.</div>';return;}
+    list.innerHTML=rows.map((c,i)=>{
+      const phone=(c.phone||"").replace(/[^0-9+]/g,"");
+      const head=c.property||c.name||"Unidentified call";
+      const sub=c.property?esc(c.name):(c.callerType?esc(c.callerType):"");
+      const oneLine=c.incident||c.summary||c.outcome||"";
+      return `<div class="card ${c.resolved?'resolved':''}" data-i="${i}">
+        <div class="bar" style="background:${barColor(c)}"></div>
         <div class="body">
-          <div class="row1">
-            <span class="badge" style="background:${meta.c}">${meta.label}</span>
-            <span class="time">${fmtTime(c.time)}</span>
-          </div>
-          <div class="name">${esc(c.name||"Unknown caller")}</div>
-          ${c.summary?`<div class="summary">${esc(c.summary)}</div>`:'<div class="summary" style="opacity:.5">No summary captured.</div>'}
+          <div class="row1">${badgesHTML(c)}
+            ${c.callerState&&c.callerState!=='Calm'?`<span class="pill">${esc(c.callerState)}</span>`:''}
+            <span class="time">${fmtTime(c.time)}</span></div>
+          <div class="prop" data-open="${i}">${esc(head)}</div>
+          ${sub?`<div class="who" data-open="${i}">${sub}</div>`:''}
+          ${oneLine?`<div class="line" data-open="${i}">${esc(oneLine)}</div>`:'<div class="line" data-open="'+i+'" style="opacity:.45">Tap for details</div>'}
           <div class="actions">
-            <a class="act call ${phoneDigits?'':'disabled'}" href="${phoneDigits?'tel:'+phoneDigits:'#'}">Call back</a>
-            <a class="act rec ${c.recordingUrl?'':'disabled'}" href="${c.recordingUrl||'#'}" target="_blank" rel="noopener">Recording</a>
-            <button class="act tr ${(c.hasTranscript||c.id)?'':'disabled'}" data-id="${c.id||''}" data-name="${esc(c.name||'')}">Transcript</button>
+            <a class="act call" href="${phone?'tel:'+phone:'#'}" style="${phone?'':'opacity:.4;pointer-events:none'}">Call back</a>
+            <button class="act rec" data-rec="${i}" ${c.hasRecording?'':'style="opacity:.4;pointer-events:none"'}>▶ Recording</button>
+            <button class="act done" data-done-btn="${i}" data-done="${c.resolved}">${c.resolved?'Handled ✓':'Mark handled'}</button>
           </div>
+          <div class="audio" id="aud-${i}"></div>
         </div></div>`;
     }).join("");
-    list.querySelectorAll(".act.tr").forEach(b=> b.addEventListener("click",()=>openTranscript(b.dataset.id,b.dataset.name)));
-  }
-  function esc(s){ return String(s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m])); }
 
-  async function openTranscript(id,name){
-    if(!id) return;
-    const bg=document.getElementById("sheetbg"), sh=document.getElementById("sheet");
-    document.getElementById("sheetTitle").textContent = name ? name+" — transcript" : "Transcript";
-    document.getElementById("sheetContent").textContent = "Loading…";
-    bg.classList.add("open"); sh.classList.add("open");
-    try{
-      const r=await fetch("/api/call/"+encodeURIComponent(id)); const d=await r.json();
-      // field path to confirm against /api/debug:
-      const t = d.transcript || d.callLog?.transcript || d.data?.transcript || JSON.stringify(d,null,2);
-      document.getElementById("sheetContent").textContent = t || "No transcript available.";
-    }catch(e){ document.getElementById("sheetContent").textContent = "Could not load transcript."; }
+    list.querySelectorAll("[data-open]").forEach(el=>el.addEventListener("click",()=>openSheet(rows[+el.dataset.open])));
+    list.querySelectorAll("[data-rec]").forEach(b=>b.addEventListener("click",e=>{e.stopPropagation();toggleRec(rows[+b.dataset.rec],+b.dataset.rec);}));
+    list.querySelectorAll("[data-done-btn]").forEach(b=>b.addEventListener("click",e=>{e.stopPropagation();toggleDone(rows[+b.dataset.doneBtn]);}));
   }
-  function closeSheet(){ document.getElementById("sheetbg").classList.remove("open"); document.getElementById("sheet").classList.remove("open"); }
-  document.getElementById("sheetX").addEventListener("click",closeSheet);
+
+  function toggleRec(c,i){
+    const slot=document.getElementById("aud-"+i);
+    if(slot.dataset.open==="1"){slot.innerHTML="";slot.dataset.open="0";return;}
+    slot.innerHTML=`<audio controls autoplay preload="none" src="/api/recording/${encodeURIComponent(c.messageId)}"></audio>`;
+    slot.dataset.open="1";
+  }
+
+  async function toggleDone(c){
+    const next=!c.resolved;c.resolved=next;render();
+    try{await fetch("/api/resolve",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:c.id,resolved:next})});}
+    catch(e){c.resolved=!next;render();}
+  }
+
+  function kv(k,v){return v?`<div class="kv"><div class="k">${k}</div><div class="v">${esc(v)}</div></div>`:"";}
+  function openSheet(c){
+    const bg=document.getElementById("sheetbg"),sh=document.getElementById("sheet");
+    document.getElementById("shTitle").textContent=c.property||c.name||"Call details";
+    document.getElementById("shSub").textContent=[c.name&&c.property?c.name:null,c.city,fmtTime(c.time)].filter(Boolean).join(" · ");
+    const internal=(c.callType==='internal')||!!c.status;
+    let rows=`<div class="row1" style="margin-bottom:10px">${badgesHTML(c)}${c.callerState&&c.callerState!=='Calm'?`<span class="pill" style="background:#e6e1d7;color:#6b675d">${esc(c.callerState)}</span>`:''}</div>`;
+    if(internal){
+      rows+=kv("Status",STA[key(c.status)]?STA[key(c.status)].t:c.status)
+        +kv("Reporter",c.identifiedAs||c.name)
+        +kv("Property",c.property)
+        +kv("Update",c.incident||c.summary)
+        +kv("Outcome",c.outcome)
+        +kv("Job",c.jobName);
+    }else{
+      rows+=kv("Priority",PRI[key(c.priority)]?PRI[key(c.priority)].t:(c.priority||"Unclassified"))
+        +kv("Why",c.priorityReason)
+        +kv("Caller",c.name)
+        +kv("They are",c.identifiedAs||c.callerType)
+        +kv("Property",c.property)
+        +kv("Summary",c.incident||c.summary)
+        +kv("Outcome",c.outcome)
+        +kv("Photo asked",c.photoRequested==='yes'?'Yes':null);
+    }
+    const phone=(c.phone||"").replace(/[^0-9+]/g,"");
+    rows+=`<div class="sheetact">
+      ${phone?`<a class="act call" href="tel:${phone}">Call back</a>`:''}
+      ${c.hasRecording?`<a class="act rec" href="/api/recording/${encodeURIComponent(c.messageId)}" target="_blank" rel="noopener">▶ Recording</a>`:''}
+      <button class="act done" id="shDone">${c.resolved?'Handled ✓':'Mark handled'}</button></div>`;
+    if(c.transcript){rows+=`<div class="scriptlbl">Transcript</div><div class="script">${esc(c.transcript)}</div>`;}
+    document.getElementById("shContent").innerHTML=rows;
+    const sd=document.getElementById("shDone");
+    if(sd)sd.addEventListener("click",()=>{toggleDone(c);sd.textContent=c.resolved?'Handled ✓':'Mark handled';});
+    bg.classList.add("open");sh.classList.add("open");
+  }
+  function closeSheet(){document.getElementById("sheetbg").classList.remove("open");document.getElementById("sheet").classList.remove("open");}
+  document.getElementById("shX").addEventListener("click",closeSheet);
   document.getElementById("sheetbg").addEventListener("click",closeSheet);
 
-  document.getElementById("chips").addEventListener("click",e=>{
-    const b=e.target.closest(".chip"); if(!b) return;
-    document.querySelectorAll(".chip").forEach(c=>c.dataset.active="false");
-    b.dataset.active="true"; filter=b.dataset.f; render();
-  });
-  document.getElementById("sortbtn").addEventListener("click",e=>{
-    desc=!desc; e.currentTarget.textContent = desc ? "↓ Newest first" : "↑ Oldest first"; render();
-  });
+  document.getElementById("chips").addEventListener("click",e=>{const b=e.target.closest(".chip");if(!b)return;
+    document.querySelectorAll(".chip").forEach(c=>c.dataset.active="false");b.dataset.active="true";filter=b.dataset.f;render();});
+  document.getElementById("sortbtn").addEventListener("click",e=>{desc=!desc;e.currentTarget.textContent=desc?"↓ Newest":"↑ Oldest";render();});
+  document.getElementById("togglebtn").addEventListener("click",e=>{showHandled=!showHandled;e.currentTarget.dataset.on=showHandled;e.currentTarget.textContent=showHandled?"Hide handled":"Show handled";render();});
 
   (async function load(){
     try{
-      const r=await fetch("/api/today"); const d=await r.json();
-      if(d.error){ document.getElementById("list").innerHTML='<div class="err">'+esc(d.error)+'</div>'; document.getElementById("datemeta").textContent=""; return; }
+      const r=await fetch("/api/today");const d=await r.json();
+      if(d.error){document.getElementById("list").innerHTML='<div class="err">'+esc(d.error)+'</div>';document.getElementById("datemeta").textContent="";return;}
       calls=d.calls||[];
       const dd=new Date((d.date||"")+"T12:00:00");
-      document.getElementById("datemeta").textContent = (isNaN(dd)?d.date:dd.toLocaleDateString([], {weekday:"long",month:"long",day:"numeric"})) + " · " + (d.tz||"");
+      document.getElementById("datemeta").textContent=(isNaN(dd)?d.date:dd.toLocaleDateString([],{weekday:"long",month:"long",day:"numeric"}))+" · "+(d.tz||"");
       render();
-    }catch(e){ document.getElementById("list").innerHTML='<div class="err">Could not reach the server.</div>'; }
+    }catch(e){document.getElementById("list").innerHTML='<div class="err">Could not reach the server.</div>';}
   })();
 </script>
 </body>

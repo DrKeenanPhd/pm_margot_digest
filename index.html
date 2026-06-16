@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- VERSION: v1.2.0 (2026-06-15)
+<!-- VERSION: v1.3.0 (2026-06-15)
      CHANGELOG:
+     - v1.3.0  Date scopes: Today / Yesterday / Last 7 days (grouped) / Pending (unhandled backlog).
      - v1.2.0  Re-skin to match EffortlessAI brand (white, electric blue, green, Archivo, wordmark).
      - v1.1.0  Branded notification-format detail sheet (SMS layout, caller-state emoji,
                Map link, OK/DONE/ESC lines), "Powered by AI Alive" footer, contactId for tagging.
@@ -34,6 +35,12 @@
     font-size:.66rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;padding:6px 12px;border-radius:999px}
   h1{font-weight:900;font-size:2.15rem;line-height:1;margin:0 0 4px;letter-spacing:-.03em}
   .datemeta{color:var(--muted);font-size:.92rem;font-weight:500}
+  .scopes{display:flex;gap:6px;margin-top:14px;overflow-x:auto;scrollbar-width:none}
+  .scopes::-webkit-scrollbar{display:none}
+  .scope{flex:0 0 auto;border:1.5px solid var(--line);background:#fff;color:var(--muted);font-weight:800;font-size:.85rem;padding:8px 14px;border-radius:10px;cursor:pointer;white-space:nowrap}
+  .scope[data-active="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .daygroup{font-weight:800;font-size:.74rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:20px 2px 4px}
+  .daygroup.first{margin-top:6px}
 
   .controls{position:sticky;top:0;z-index:5;background:linear-gradient(var(--bg) 76%,rgba(255,255,255,0));padding:12px 0}
   .chips{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
@@ -109,6 +116,12 @@
       <div class="kicker">Property Manager's Instant Response</div>
       <h1>Today's Calls</h1>
       <div class="datemeta" id="datemeta">Loading…</div>
+      <div class="scopes" id="scopes">
+        <button class="scope" data-s="today" data-active="true">Today</button>
+        <button class="scope" data-s="yesterday">Yesterday</button>
+        <button class="scope" data-s="week">Last 7 days</button>
+        <button class="scope" data-s="pending">Pending</button>
+      </div>
     </header>
 
     <div class="controls">
@@ -156,10 +169,13 @@
   const PFULL={P1:"CRITICAL",P2:"URGENT",P3:"HIGH PRIORITY",P4:"STANDARD"};
   const SFULL={S1:"URGENT",S2:"NEEDS ATTENTION",S3:"WORKING / ON-SITE",S4:"COMPLETE"};
   const STATE={Calm:"🟢",Urgent:"🟠",Distressed:"🔴",Agro:"⚡"};
-  let calls=[],filter="all",desc=true,showHandled=false;
+  let calls=[],filter="all",desc=true,showHandled=false,scope="today",todayStr="";
 
   const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
   const fmtTime=t=>{if(!t)return"";const d=new Date(t);return isNaN(d)?"":d.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})};
+  const fmtDate=t=>{if(!t)return"";const d=new Date(t);return isNaN(d)?"":d.toLocaleDateString([],{month:"short",day:"numeric"})};
+  function addDays(dstr,n){const[y,m,da]=dstr.split("-").map(Number);const dt=new Date(Date.UTC(y,m-1,da));dt.setUTCDate(dt.getUTCDate()+n);return dt.toISOString().slice(0,10);}
+  function dayHeader(dstr){if(!dstr)return"";if(dstr===todayStr)return"Today";if(todayStr&&dstr===addDays(todayStr,-1))return"Yesterday";const d=new Date(dstr+"T12:00:00");return isNaN(d)?dstr:d.toLocaleDateString([],{weekday:"long",month:"short",day:"numeric"});}
   const key=v=>(v||"").toString().toUpperCase().slice(0,2);
   const badgeMeta=c=>{const p=key(c.priority),s=key(c.status);
     if(PRI[p]&&STA[s])return[PRI[p],STA[s]];
@@ -180,34 +196,43 @@
     return rows;
   }
 
+  function cardHTML(c,i,multiDay){
+    const phone=(c.phone||"").replace(/[^0-9+]/g,"");
+    const head=c.property||c.name||"Unidentified call";
+    const sub=c.property?esc(c.name):(c.callerType?esc(c.callerType):"");
+    const oneLine=c.incident||c.summary||c.outcome||"";
+    const when=(multiDay?fmtDate(c.time)+" · ":"")+fmtTime(c.time);
+    return `<div class="card ${c.resolved?'resolved':''}" data-i="${i}">
+      <div class="bar" style="background:${barColor(c)}"></div>
+      <div class="body">
+        <div class="row1">${badgesHTML(c)}
+          ${c.callerState&&c.callerState!=='Calm'?`<span class="pill">${STATE[c.callerState]||''} ${esc(c.callerState)}</span>`:''}
+          <span class="time">${when}</span></div>
+        <div class="prop" data-open="${i}">${esc(head)}</div>
+        ${sub?`<div class="who" data-open="${i}">${sub}</div>`:''}
+        ${oneLine?`<div class="line" data-open="${i}">${esc(oneLine)}</div>`:'<div class="line" data-open="'+i+'" style="opacity:.45">Tap for details</div>'}
+        <div class="actions">
+          <a class="act call" href="${phone?'tel:'+phone:'#'}" style="${phone?'':'opacity:.4;pointer-events:none'}">Call back</a>
+          <button class="act rec" data-rec="${i}" ${c.hasRecording?'':'style="opacity:.4;pointer-events:none"'}>▶ Recording</button>
+          <button class="act done" data-done-btn="${i}" data-done="${c.resolved}">${c.resolved?'Handled ✓':'Mark handled'}</button>
+        </div>
+        <div class="audio" id="aud-${i}"></div>
+      </div></div>`;
+  }
+
   function render(){
     const list=document.getElementById("list");
     const rows=visible();
     document.getElementById("count").textContent=rows.length+(rows.length===1?" call":" calls");
-    if(!rows.length){list.innerHTML='<div class="empty">Nothing here right now.</div>';return;}
-    list.innerHTML=rows.map((c,i)=>{
-      const phone=(c.phone||"").replace(/[^0-9+]/g,"");
-      const head=c.property||c.name||"Unidentified call";
-      const sub=c.property?esc(c.name):(c.callerType?esc(c.callerType):"");
-      const oneLine=c.incident||c.summary||c.outcome||"";
-      return `<div class="card ${c.resolved?'resolved':''}" data-i="${i}">
-        <div class="bar" style="background:${barColor(c)}"></div>
-        <div class="body">
-          <div class="row1">${badgesHTML(c)}
-            ${c.callerState&&c.callerState!=='Calm'?`<span class="pill">${STATE[c.callerState]||''} ${esc(c.callerState)}</span>`:''}
-            <span class="time">${fmtTime(c.time)}</span></div>
-          <div class="prop" data-open="${i}">${esc(head)}</div>
-          ${sub?`<div class="who" data-open="${i}">${sub}</div>`:''}
-          ${oneLine?`<div class="line" data-open="${i}">${esc(oneLine)}</div>`:'<div class="line" data-open="'+i+'" style="opacity:.45">Tap for details</div>'}
-          <div class="actions">
-            <a class="act call" href="${phone?'tel:'+phone:'#'}" style="${phone?'':'opacity:.4;pointer-events:none'}">Call back</a>
-            <button class="act rec" data-rec="${i}" ${c.hasRecording?'':'style="opacity:.4;pointer-events:none"'}>▶ Recording</button>
-            <button class="act done" data-done-btn="${i}" data-done="${c.resolved}">${c.resolved?'Handled ✓':'Mark handled'}</button>
-          </div>
-          <div class="audio" id="aud-${i}"></div>
-        </div></div>`;
-    }).join("");
-
+    if(!rows.length){list.innerHTML='<div class="empty">'+(scope==='pending'?'Nothing pending — all caught up.':'No calls in this view.')+'</div>';return;}
+    const multiDay=(scope==='week'||scope==='pending');
+    const grouped=(scope==='week');
+    let html="",lastDay=null,first=true;
+    rows.forEach((c,i)=>{
+      if(grouped&&c.day!==lastDay){html+=`<div class="daygroup ${first?'first':''}">${dayHeader(c.day)}</div>`;lastDay=c.day;first=false;}
+      html+=cardHTML(c,i,multiDay);
+    });
+    list.innerHTML=html;
     list.querySelectorAll("[data-open]").forEach(el=>el.addEventListener("click",()=>openSheet(rows[+el.dataset.open])));
     list.querySelectorAll("[data-rec]").forEach(b=>b.addEventListener("click",e=>{e.stopPropagation();toggleRec(rows[+b.dataset.rec],+b.dataset.rec);}));
     list.querySelectorAll("[data-done-btn]").forEach(b=>b.addEventListener("click",e=>{e.stopPropagation();toggleDone(rows[+b.dataset.doneBtn]);}));
@@ -285,16 +310,41 @@
   document.getElementById("sortbtn").addEventListener("click",e=>{desc=!desc;e.currentTarget.textContent=desc?"↓ Newest":"↑ Oldest";render();});
   document.getElementById("togglebtn").addEventListener("click",e=>{showHandled=!showHandled;e.currentTarget.dataset.on=showHandled;e.currentTarget.textContent=showHandled?"Hide handled":"Show handled";render();});
 
-  (async function load(){
+  function setDateMeta(d){
+    const fmtFull=ds=>{const x=new Date(ds+"T12:00:00");return isNaN(x)?ds:x.toLocaleDateString([],{weekday:"long",month:"long",day:"numeric"});};
+    let txt="";
+    if(scope==='today')txt=fmtFull(d.date)+" · "+(d.tz||"");
+    else if(scope==='yesterday')txt="Yesterday · "+fmtFull(addDays(d.date,-1));
+    else if(scope==='week')txt="Last 7 days · through "+fmtFull(d.date);
+    else if(scope==='pending')txt="Pending · unhandled across recent days";
+    document.getElementById("datemeta").textContent=txt;
+  }
+
+  async function load(){
+    document.getElementById("list").innerHTML='<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>';
     try{
-      const r=await fetch("/api/today");const d=await r.json();
+      const r=await fetch("/api/calls?scope="+encodeURIComponent(scope));const d=await r.json();
       if(d.error){document.getElementById("list").innerHTML='<div class="err">'+esc(d.error)+'</div>';document.getElementById("datemeta").textContent="";return;}
-      calls=d.calls||[];
-      const dd=new Date((d.date||"")+"T12:00:00");
-      document.getElementById("datemeta").textContent=(isNaN(dd)?d.date:dd.toLocaleDateString([],{weekday:"long",month:"long",day:"numeric"}))+" · "+(d.tz||"");
+      calls=d.calls||[];todayStr=d.date||"";
+      setDateMeta(d);
       render();
     }catch(e){document.getElementById("list").innerHTML='<div class="err">Could not reach the server.</div>';}
-  })();
+  }
+
+  document.getElementById("scopes").addEventListener("click",e=>{
+    const b=e.target.closest(".scope");if(!b)return;
+    document.querySelectorAll(".scope").forEach(s=>s.dataset.active="false");b.dataset.active="true";
+    scope=b.dataset.s;
+    desc=(scope!=='pending');                                  // pending defaults oldest-first
+    document.getElementById("sortbtn").textContent=desc?"↓ Newest":"↑ Oldest";
+    showHandled=false;
+    const tog=document.getElementById("togglebtn");
+    tog.dataset.on="false";tog.textContent="Show handled";
+    tog.style.display=(scope==='pending')?'none':'';           // nothing handled to show in pending
+    load();
+  });
+
+  load();
 </script>
 </body>
 </html>

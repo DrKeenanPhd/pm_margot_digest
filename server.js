@@ -1,5 +1,6 @@
-/* VERSION: v1.1.0  (2026-06-15)
+/* VERSION: v1.3.0  (2026-06-15)
    CHANGELOG:
+   - v1.3.0  Scoped views: /api/calls?scope=today|yesterday|week|pending (multi-day paging).
    - v1.1.0  Add/remove "Handled" tag on contact when marking handled; pass contactId.
    - v1.0.0  Agent-filtered today's calls, P/S mapping, recording proxy, page-side resolve.
 */
@@ -113,6 +114,7 @@ function mapCall(c, resolved) {
     photoRequested: pick(idx, "photoRequested"),
     summary: c.summary || null,
     transcript: c.transcript || null,
+    day: c.createdAt ? ymd(new Date(c.createdAt), TZ) : null,
     hasRecording: Boolean(c.messageId),
     resolved: Boolean(resolved && resolved[c.id]),
   };
@@ -121,6 +123,56 @@ function mapCall(c, resolved) {
 // ---- date helpers -------------------------------------------------
 function ymd(d, tz) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+}
+
+// date helpers
+function ymdAddDays(ymdStr, n) {
+  const [y, m, d] = ymdStr.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + n);
+  return dt.toISOString().slice(0, 10);
+}
+const PENDING_DAYS = parseInt(process.env.PENDING_DAYS || "30", 10);
+
+// scope → { earliest ymd to include, how to filter, sort direction }
+function scopeWindow(scope, today) {
+  switch (scope) {
+    case "yesterday": { const y = ymdAddDays(today, -1); return { from: y, keep: (d) => d === y, asc: false }; }
+    case "week":      { const f = ymdAddDays(today, -6); return { from: f, keep: (d) => d >= f && d <= today, asc: false }; }
+    case "pending":   { const f = ymdAddDays(today, -(PENDING_DAYS - 1)); return { from: f, keep: (d) => d >= f && d <= today, asc: true, unresolvedOnly: true }; }
+    case "today":
+    default:          return { from: today, keep: (d) => d === today, asc: false };
+  }
+}
+
+async function fetchCalls(scope, res) {
+  const today = ymd(new Date(), TZ);
+  const win = scopeWindow(scope, today);
+  const PAGE_SIZE = 50;        // endpoint hard max
+  const MAX_PAGES = 12;        // safety cap (≤600 most-recent calls)
+  let raw = [];
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const url = new URL(GHL_BASE + "/voice-ai/dashboard/call-logs");
+    url.searchParams.set("locationId", LOCATION_ID);
+    url.searchParams.set("pageSize", String(PAGE_SIZE));
+    url.searchParams.set("page", String(page));
+    const r = await fetch(url, { headers: ghlHeaders() });
+    if (!r.ok) { res.status(r.status).json({ error: "GHL request failed", status: r.status, detail: await r.text() }); return null; }
+    const data = await r.json();
+    const logs = data.callLogs || [];
+    raw.push(...logs);
+    const oldest = logs[logs.length - 1];               // newest-first → last is oldest
+    if (logs.length < PAGE_SIZE) break;
+    if (oldest && oldest.createdAt && ymd(new Date(oldest.createdAt), TZ) < win.from) break;
+  }
+  const resolved = readResolved();
+  let calls = raw
+    .filter((c) => c.agentId === AGENT_ID)
+    .filter((c) => c.createdAt && win.keep(ymd(new Date(c.createdAt), TZ)))
+    .map((c) => mapCall(c, resolved));
+  if (win.unresolvedOnly) calls = calls.filter((c) => !c.resolved);
+  calls.sort((a, b) => (win.asc ? 1 : -1) * (new Date(a.time || 0) - new Date(b.time || 0)));
+  return { scope, date: today, tz: TZ, count: calls.length, calls };
 }
 
 // ---- routes -------------------------------------------------------
@@ -139,36 +191,21 @@ app.get("/api/debug", async (_q, res) => {
   } catch (e) { res.status(500).json({ error: String(e) }); }
 });
 
-app.get("/api/today", async (_q, res) => {
+// Scoped calls: ?scope=today|yesterday|week|pending  (default today)
+app.get("/api/calls", async (req, res) => {
   if (!PIT || !LOCATION_ID) return res.status(500).json({ error: "Missing GHL_PIT or GHL_LOCATION_ID." });
   try {
-    const today = ymd(new Date(), TZ);
-    const PAGE_SIZE = 50;   // endpoint hard max
-    const MAX_PAGES = 6;    // safety cap (≤300 most-recent calls)
-    let raw = [];
-    for (let page = 1; page <= MAX_PAGES; page++) {
-      const url = new URL(GHL_BASE + "/voice-ai/dashboard/call-logs");
-      url.searchParams.set("locationId", LOCATION_ID);
-      url.searchParams.set("pageSize", String(PAGE_SIZE));
-      url.searchParams.set("page", String(page));
-      const r = await fetch(url, { headers: ghlHeaders() });
-      if (!r.ok) return res.status(r.status).json({ error: "GHL request failed", status: r.status, detail: await r.text() });
-      const data = await r.json();
-      const logs = data.callLogs || [];
-      raw.push(...logs);
-      // results are newest-first; stop once the oldest on this page predates today
-      const oldest = logs[logs.length - 1];
-      if (logs.length < PAGE_SIZE) break;
-      if (oldest && oldest.createdAt && ymd(new Date(oldest.createdAt), TZ) < today) break;
-    }
-    const resolved = readResolved();
-    const calls = raw
-      .filter((c) => c.agentId === AGENT_ID)
-      .filter((c) => c.createdAt && ymd(new Date(c.createdAt), TZ) === today)
-      .map((c) => mapCall(c, resolved))
-      .sort((a, b) => new Date(b.time || 0) - new Date(a.time || 0));
-    res.json({ date: today, tz: TZ, count: calls.length, calls });
+    const scope = ["today", "yesterday", "week", "pending"].includes(req.query.scope) ? req.query.scope : "today";
+    const out = await fetchCalls(scope, res);
+    if (out) res.json(out);
   } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+// Back-compat alias
+app.get("/api/today", async (_q, res) => {
+  if (!PIT || !LOCATION_ID) return res.status(500).json({ error: "Missing GHL_PIT or GHL_LOCATION_ID." });
+  try { const out = await fetchCalls("today", res); if (out) res.json(out); }
+  catch (e) { res.status(500).json({ error: String(e) }); }
 });
 
 // Stream the call recording (token stays server-side)

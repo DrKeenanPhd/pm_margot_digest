@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- VERSION: v1.5.1 (2026-06-15)
+     Records & Evidence page: date-range + address/text search, priority/handled filters,
+     full per-call evidence detail (transcript, recording, outcome, handled-at), CSV export of
+     the filtered set, printable per-call evidence sheet. Photos section is stubbed for the
+     Conversations-API wiring (next). Optional password gate via RECORDS_PASSWORD. -->
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Effortless AI — Records & Evidence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#ffffff; --band:#f4f7fb; --ink:#0e1626; --muted:#5a6573; --line:#e6e9ef;
+    --brand:#2a64f6; --green:#16a34a;
+    --p1:#e5484d; --p2:#f5820b; --p3:#e3b40a; --p4:#22a85a;
+    --s1:#e5484d; --s2:#8b3fd6; --s3:#2f6fed; --s4:#22a85a;
+    --notif:#1b2130;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:"Archivo",system-ui,sans-serif;
+    padding:env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 48px);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:780px;margin:0 auto;padding:0 16px}
+  a{color:var(--brand)}
+
+  header{padding:20px 0 8px}
+  .brand{font-weight:900;font-size:1.4rem;letter-spacing:-.02em}
+  .brand .ai{color:var(--green)}
+  .topline{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .backlink{font-weight:700;font-size:.85rem;text-decoration:none}
+  .kicker{display:inline-block;margin:14px 0 8px;background:rgba(42,100,246,.10);color:var(--brand);
+    font-size:.66rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;padding:6px 12px;border-radius:999px}
+  h1{font-weight:900;font-size:1.9rem;line-height:1;margin:0 0 4px;letter-spacing:-.03em}
+  .sub{color:var(--muted);font-size:.92rem;font-weight:500}
+
+  .panel{background:var(--band);border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:14px;display:grid;gap:10px}
+  .frow{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+  .field{display:flex;flex-direction:column;gap:4px}
+  .field label{font-size:.7rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  input[type=date],input[type=search],select{font:inherit;font-size:.92rem;padding:9px 11px;border:1.5px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+  input[type=search]{min-width:200px;flex:1}
+  .grow{flex:1;min-width:200px}
+  .btn{font:inherit;font-weight:800;font-size:.9rem;padding:10px 16px;border-radius:10px;border:none;cursor:pointer}
+  .btn.primary{background:var(--brand);color:#fff}
+  .btn.ghost{background:#fff;color:var(--ink);border:1.5px solid var(--line)}
+
+  .meta{display:flex;justify-content:space-between;align-items:center;margin:16px 2px 8px;gap:10px;flex-wrap:wrap}
+  .count{font-weight:700;color:var(--muted);font-size:.9rem}
+  .warn{color:#9a6a00;background:#fff7e6;border:1px solid #ffe3a3;border-radius:8px;padding:7px 10px;font-size:.8rem;font-weight:600}
+
+  .list{display:flex;flex-direction:column;gap:10px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 3px 12px rgba(14,22,38,.05);cursor:pointer}
+  .card .bar{height:4px}
+  .card .body{padding:12px 14px;display:grid;gap:3px}
+  .r1{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .badge{font-weight:800;font-size:.66rem;letter-spacing:.03em;padding:3px 8px;border-radius:6px;color:#fff}
+  .badge.unc{background:#8a93a3}
+  .when{margin-left:auto;font-size:.76rem;color:#9aa3b1;font-weight:600}
+  .prop{font-weight:800;font-size:1.06rem;letter-spacing:-.01em}
+  .who{color:var(--muted);font-size:.85rem}
+  .out{color:#3a4452;font-size:.88rem;margin-top:2px}
+  .hchip{font-size:.64rem;font-weight:800;letter-spacing:.03em;text-transform:uppercase;padding:3px 7px;border-radius:6px}
+  .hchip.yes{background:#eafaf0;color:#128a43}
+  .hchip.no{background:#fdeaea;color:#b5302a}
+  .empty,.err{text-align:center;color:var(--muted);padding:42px 16px}
+  .err{color:#c0362f}
+  .skeleton{height:84px;border-radius:14px;background:linear-gradient(100deg,#eef1f6 30%,#f6f8fb 50%,#eef1f6 70%);background-size:200% 100%;animation:sh 1.2s infinite;border:1px solid var(--line)}
+  @keyframes sh{to{background-position:-200% 0}}
+
+  .sheet-bg{position:fixed;inset:0;background:rgba(14,22,38,.42);opacity:0;pointer-events:none;transition:.2s;z-index:20}
+  .sheet-bg.open{opacity:1;pointer-events:auto}
+  .sheet{position:fixed;left:50%;transform:translate(-50%,100%);bottom:0;width:100%;max-width:780px;max-height:92vh;background:#fff;border-radius:20px 20px 0 0;transition:.25s cubic-bezier(.2,.8,.2,1);z-index:21;display:flex;flex-direction:column;box-shadow:0 -8px 40px rgba(14,22,38,.18)}
+  .sheet.open{transform:translate(-50%,0)}
+  .sheet .top{display:flex;align-items:flex-start;justify-content:space-between;padding:16px 18px 12px;border-bottom:1px solid var(--line);gap:10px}
+  .sheet .top h3{font-weight:800;margin:0;font-size:1.2rem;line-height:1.1}
+  .sheet .top .s{color:var(--muted);font-size:.84rem;margin-top:3px;font-weight:500}
+  .sheet .x{border:none;background:#eef1f6;width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer;flex:0 0 auto}
+  .content{overflow-y:auto;padding:14px 18px 26px}
+  .kv{display:flex;gap:12px;padding:7px 0;border-bottom:1px solid #eef1f6;font-size:.92rem}
+  .kv .k{flex:0 0 130px;color:var(--muted);font-weight:700}
+  .kv .v{flex:1}
+  .lbl{font-weight:800;margin:16px 0 7px;font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .script{white-space:pre-wrap;line-height:1.55;font-size:.9rem;background:var(--band);border-radius:12px;padding:12px 14px;max-height:34vh;overflow-y:auto;color:#2a3340}
+  .audio audio{width:100%;height:38px;margin-top:6px}
+  .photos-empty{font-size:.86rem;color:var(--muted);background:var(--band);border:1px dashed var(--line);border-radius:12px;padding:14px}
+  .sheetact{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+  .brandfoot{text-align:center;color:var(--muted);font-size:.78rem;padding:26px 0 6px;font-weight:500}
+  .brandfoot b{color:var(--ink)}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="topline">
+        <div class="brand">Effortless<span class="ai">AI</span></div>
+        <a class="backlink" href="/">← Today's Calls</a>
+      </div>
+      <div class="kicker">Records &amp; Evidence</div>
+      <h1>Call Records</h1>
+      <div class="sub">Search and pull the full record for any call — for owner reporting and dispute evidence.</div>
+
+      <div class="panel">
+        <div class="frow">
+          <div class="field"><label>From</label><input type="date" id="from"></div>
+          <div class="field"><label>To</label><input type="date" id="to"></div>
+          <div class="field grow"><label>Search</label><input type="search" id="q" placeholder="Address, caller, or issue…"></div>
+        </div>
+        <div class="frow">
+          <div class="field"><label>Priority / Status</label>
+            <select id="priority">
+              <option value="all">All</option>
+              <option>P1</option><option>P2</option><option>P3</option><option>P4</option>
+              <option>S1</option><option>S2</option><option>S3</option><option>S4</option>
+            </select>
+          </div>
+          <div class="field"><label>Handled</label>
+            <select id="handled"><option value="all">All</option><option value="handled">Handled</option><option value="unhandled">Unhandled</option></select>
+          </div>
+          <div class="field" style="margin-left:auto"><label>&nbsp;</label><button class="btn primary" id="searchBtn">Search</button></div>
+          <div class="field"><label>&nbsp;</label><button class="btn ghost" id="csvBtn">⤓ Export CSV</button></div>
+        </div>
+      </div>
+
+      <div class="meta">
+        <span class="count" id="count"></span>
+        <span class="warn" id="warn" style="display:none"></span>
+      </div>
+    </header>
+
+    <div class="list" id="list"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+    <div class="brandfoot">Powered by <b>AI Alive</b></div>
+  </div>
+
+  <div class="sheet-bg" id="sheetbg"></div>
+  <div class="sheet" id="sheet">
+    <div class="top"><div><h3 id="shTitle"></h3><div class="s" id="shSub"></div></div><button class="x" id="shX">×</button></div>
+    <div class="content" id="shContent"></div>
+  </div>
+
+<script>
+  const PRI={P1:"P1 · CRITICAL",P2:"P2 · URGENT",P3:"P3 · HIGH",P4:"P4 · STANDARD"};
+  const STA={S1:"S1 · URGENT",S2:"S2 · NEEDS ATTENTION",S3:"S3 · WORKING",S4:"S4 · COMPLETE"};
+  const COL={P1:"--p1",P2:"--p2",P3:"--p3",P4:"--p4",S1:"--s1",S2:"--s2",S3:"--s3",S4:"--s4"};
+  let rows=[],pendingOpenId=null;
+  const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+  const key=v=>(v||"").toString().toUpperCase().slice(0,2);
+  const fmtDateTime=t=>{if(!t)return"";const d=new Date(t);return isNaN(d)?"":d.toLocaleString([],{month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"})};
+  function badge(c){const p=key(c.priority),s=key(c.status);
+    if(PRI[p])return`<span class="badge" style="background:var(${COL[p]})">${PRI[p]}</span>`;
+    if(STA[s])return`<span class="badge" style="background:var(${COL[s]})">${STA[s]}</span>`;
+    return`<span class="badge unc">UNCLASSIFIED</span>`;}
+  function barColor(c){const p=key(c.priority),s=key(c.status);const v=COL[p]||COL[s];return v?`var(${v})`:"#8a93a3";}
+
+  function params(){
+    const u=new URLSearchParams();
+    const f=document.getElementById("from").value,t=document.getElementById("to").value,q=document.getElementById("q").value.trim();
+    const pr=document.getElementById("priority").value,h=document.getElementById("handled").value;
+    if(f)u.set("from",f);if(t)u.set("to",t);if(q)u.set("q",q);
+    if(pr&&pr!=="all")u.set("priority",pr);if(h&&h!=="all")u.set("handled",h);
+    return u.toString();
+  }
+
+  async function search(){
+    document.getElementById("list").innerHTML='<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>';
+    try{
+      const r=await fetch("/api/records?"+params());const d=await r.json();
+      if(d.error){document.getElementById("list").innerHTML='<div class="err">'+esc(d.error)+'</div>';return;}
+      rows=d.calls||[];
+      if(!document.getElementById("from").value)document.getElementById("from").value=d.from;
+      if(!document.getElementById("to").value)document.getElementById("to").value=d.to;
+      document.getElementById("count").textContent=rows.length+(rows.length===1?" record":" records")+" · "+d.from+" → "+d.to;
+      const w=document.getElementById("warn");
+      if(d.truncated){w.style.display="";w.textContent="Showing the most recent 1000 calls — narrow the range for older records.";}else w.style.display="none";
+      render();
+      if(pendingOpenId){const idx=rows.findIndex(c=>c.id===pendingOpenId);if(idx>=0)openSheet(rows[idx]);pendingOpenId=null;}
+    }catch(e){document.getElementById("list").innerHTML='<div class="err">Could not reach the server.</div>';}
+  }
+
+  function render(){
+    const list=document.getElementById("list");
+    if(!rows.length){list.innerHTML='<div class="empty">No records match these filters.</div>';return;}
+    list.innerHTML=rows.map((c,i)=>`<div class="card" data-i="${i}">
+      <div class="bar" style="background:${barColor(c)}"></div>
+      <div class="body">
+        <div class="r1">${badge(c)}<span class="hchip ${c.resolved?'yes':'no'}">${c.resolved?'Handled':'Open'}</span><span class="when">${fmtDateTime(c.time)}</span></div>
+        <div class="prop">${esc(c.property||c.name||'Unidentified call')}</div>
+        <div class="who">${esc(c.name||'')}${c.city?' · '+esc(c.city):''}</div>
+        ${(c.outcome||c.incident)?`<div class="out">${esc(c.outcome||c.incident)}</div>`:''}
+      </div></div>`).join("");
+    list.querySelectorAll(".card").forEach(el=>el.addEventListener("click",()=>openSheet(rows[+el.dataset.i])));
+  }
+
+  function kv(k,v){return v?`<div class="kv"><div class="k">${k}</div><div class="v">${esc(v)}</div></div>`:"";}
+  function openSheet(c){
+    const internal=(c.callType==='internal')||!!c.status;
+    document.getElementById("shTitle").textContent=c.property||c.name||"Call record";
+    document.getElementById("shSub").textContent=[c.name&&c.property?c.name:null,c.city,fmtDateTime(c.time)].filter(Boolean).join(" · ");
+    const cls=internal?(STA[key(c.status)]||c.status):(PRI[key(c.priority)]||c.priority||"Unclassified");
+    let html=kv("Received",fmtDateTime(c.time))
+      +kv("Caller",c.name)+kv("Phone",c.phone)+kv("Type",c.callType)
+      +kv(internal?"Status":"Priority",cls)
+      +kv("Reason",c.priorityReason)+kv("Caller state",c.callerState)
+      +kv("Property",[c.property,c.city,c.state].filter(Boolean).join(", "))
+      +kv("Their words",c.incident)+kv("Outcome",c.outcome)
+      +kv("Photo requested",c.photoRequested==='yes'?'Yes':null)
+      +kv("Handled",c.resolved?('Yes'+(c.resolvedAt?' · '+fmtDateTime(c.resolvedAt):'')):'No');
+
+    if(c.hasRecording)html+='<div class="lbl">Recording</div><div class="audio"><audio controls preload="none" src="/api/recording/'+encodeURIComponent(c.messageId)+'"></audio></div>';
+    html+='<div class="lbl">Photos</div><div class="photos-empty">Tenant and job-site photos load from the conversation thread — coming in the next update.</div>';
+    if(c.transcript)html+='<div class="lbl">Transcript</div><div class="script">'+esc(c.transcript)+'</div>';
+    html+='<div class="sheetact"><button class="btn ghost" id="printBtn">🖨 Print evidence sheet</button></div>';
+
+    document.getElementById("shContent").innerHTML=html;
+    document.getElementById("printBtn").addEventListener("click",()=>printSheet(c,cls,internal));
+    document.getElementById("sheetbg").classList.add("open");
+    document.getElementById("sheet").classList.add("open");
+  }
+  function closeSheet(){document.getElementById("sheetbg").classList.remove("open");document.getElementById("sheet").classList.remove("open");}
+  document.getElementById("shX").addEventListener("click",closeSheet);
+  document.getElementById("sheetbg").addEventListener("click",closeSheet);
+
+  function printSheet(c,cls,internal){
+    const base=location.origin;
+    const row=(k,v)=>v?`<tr><td class="k">${k}</td><td>${esc(v)}</td></tr>`:"";
+    const w=window.open("","_blank");
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Call Record — ${esc(c.property||c.name||"")}</title>
+      <style>body{font-family:Arial,Helvetica,sans-serif;color:#111;max-width:720px;margin:30px auto;padding:0 20px;line-height:1.45}
+      h1{font-size:18px;margin:0 0 2px}.muted{color:#666;font-size:13px;margin-bottom:16px}
+      table{border-collapse:collapse;width:100%;font-size:13px;margin-bottom:14px}td{padding:6px 8px;border-bottom:1px solid #e3e3e3;vertical-align:top}
+      td.k{color:#666;font-weight:bold;width:160px}h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#666;margin:16px 0 6px}
+      .script{white-space:pre-wrap;background:#f6f6f6;border:1px solid #e3e3e3;border-radius:6px;padding:10px;font-size:12px}
+      .foot{margin-top:24px;color:#999;font-size:11px;border-top:1px solid #e3e3e3;padding-top:8px}</style></head><body>
+      <h1>Call Record — ${esc(c.property||c.name||"Unidentified")}</h1>
+      <div class="muted">Effortless AI · Property Manager's Instant Response — generated ${new Date().toLocaleString()}</div>
+      <table>
+        ${row("Received",fmtDateTime(c.time))}${row("Caller",c.name)}${row("Phone",c.phone)}${row("Type",c.callType)}
+        ${row(internal?"Status":"Priority",cls)}${row("Reason",c.priorityReason)}${row("Caller state",c.callerState)}
+        ${row("Property",[c.property,c.city,c.state].filter(Boolean).join(", "))}
+        ${row("Their words",c.incident)}${row("Outcome",c.outcome)}
+        ${row("Photo requested",c.photoRequested==='yes'?'Yes':'')}
+        ${row("Handled",c.resolved?('Yes'+(c.resolvedAt?' — '+fmtDateTime(c.resolvedAt):'')):'No')}
+        ${row("Recording",c.hasRecording?base+"/api/recording/"+encodeURIComponent(c.messageId):"")}
+        ${row("Call ID",c.id)}
+      </table>
+      ${c.transcript?'<h2>Transcript</h2><div class="script">'+esc(c.transcript)+'</div>':''}
+      <div class="foot">This record was generated from the call log on ${new Date().toLocaleString()}. Recording available at the link above.</div>
+      </body></html>`);
+    w.document.close();w.focus();setTimeout(()=>w.print(),300);
+  }
+
+  document.getElementById("searchBtn").addEventListener("click",search);
+  document.getElementById("csvBtn").addEventListener("click",()=>{window.location.href="/api/records.csv?"+params();});
+  document.getElementById("q").addEventListener("keydown",e=>{if(e.key==="Enter")search();});
+
+  (function init(){
+    const u=new URLSearchParams(location.search);
+    const id=u.get("id"),date=u.get("date"),q=u.get("q");
+    if(date){document.getElementById("from").value=date;document.getElementById("to").value=date;}
+    if(q)document.getElementById("q").value=q;
+    pendingOpenId=id||null;
+    search();
+  })();
+</script>
+</body>
+</html>

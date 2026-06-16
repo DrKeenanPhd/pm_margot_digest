@@ -1,5 +1,9 @@
-/* VERSION: v1.3.0  (2026-06-15)
+/* VERSION: v1.5.1  (2026-06-15)
    CHANGELOG:
+   - v1.5.1  CSV "Record Link" column (deep-links to the call's detail on /records).
+   - v1.5.0  Records & Evidence: /records + /api/records (date range, address/text search,
+   #          priority/handled filters), /api/records.csv, optional RECORDS_PASSWORD gate.
+   - v1.4.0  CSV export endpoint (/api/export.csv) with handled + handled-at, ?scope or ?days.
    - v1.3.0  Scoped views: /api/calls?scope=today|yesterday|week|pending (multi-day paging).
    - v1.1.0  Add/remove "Handled" tag on contact when marking handled; pass contactId.
    - v1.0.0  Agent-filtered today's calls, P/S mapping, recording proxy, page-side resolve.
@@ -31,6 +35,7 @@ const LOCATION_ID = process.env.GHL_LOCATION_ID;
 const TZ = process.env.DIGEST_TZ || "America/Los_Angeles";
 const AGENT_ID = process.env.AGENT_ID || "6a0e385e321d30067d28477a"; // Margot
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
+const RECORDS_PASSWORD = process.env.RECORDS_PASSWORD || ""; // empty = Records page open; set to lock
 
 function ghlHeaders() {
   return { Authorization: `Bearer ${PIT}`, Version: "2021-07-28", Accept: "application/json" };
@@ -78,6 +83,8 @@ function abbrevAddress(raw) {
     [/\bCourt\b/gi, "Ct"], [/\bPlace\b/gi, "Pl"], [/\bUnit\b/gi, "#"], [/\bApartment\b/gi, "Apt"],
   ];
   for (const [re, to] of repl) s = s.replace(re, to);
+  s = s.replace(/#\s+/g, "#");                              // "# 4b" -> "#4b"
+  s = s.replace(/(\d)([a-z])\b/g, (_m, d, l) => d + l.toUpperCase()); // 4b -> 4B
   return s.replace(/\s+/g, " ").trim();
 }
 
@@ -117,6 +124,7 @@ function mapCall(c, resolved) {
     day: c.createdAt ? ymd(new Date(c.createdAt), TZ) : null,
     hasRecording: Boolean(c.messageId),
     resolved: Boolean(resolved && resolved[c.id]),
+    resolvedAt: resolved && resolved[c.id] ? resolved[c.id].at : null,
   };
 }
 
@@ -145,9 +153,13 @@ function scopeWindow(scope, today) {
   }
 }
 
-async function fetchCalls(scope, res) {
+async function fetchCalls(scope, res, daysOverride) {
   const today = ymd(new Date(), TZ);
-  const win = scopeWindow(scope, today);
+  let win = scopeWindow(scope, today);
+  if (daysOverride && daysOverride > 0) {
+    const from = ymdAddDays(today, -(daysOverride - 1));
+    win = { from, keep: (d) => d >= from && d <= today, asc: false };
+  }
   const PAGE_SIZE = 50;        // endpoint hard max
   const MAX_PAGES = 12;        // safety cap (≤600 most-recent calls)
   let raw = [];
@@ -207,6 +219,138 @@ app.get("/api/today", async (_q, res) => {
   try { const out = await fetchCalls("today", res); if (out) res.json(out); }
   catch (e) { res.status(500).json({ error: String(e) }); }
 });
+
+// CSV helpers
+function fmtTZParts(iso) {
+  if (!iso) return { date: "", time: "" };
+  const d = new Date(iso); if (isNaN(d)) return { date: "", time: "" };
+  const date = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+  const time = new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
+  return { date, time };
+}
+function csv(v) { if (v === null || v === undefined) return '""'; return '"' + String(v).replace(/"/g, '""') + '"'; }
+function callsToCsv(calls, base) {
+  const cols = ["Date","Time","Property","City","State","Caller","Phone","Call Type","Priority","Status","Urgency","Reason","Caller State","Incident","Outcome","Photo Requested","Handled","Handled At","Recording","Record Link","Call ID"];
+  const lines = [cols.map(csv).join(",")];
+  for (const c of calls) {
+    const t = fmtTZParts(c.time);
+    const pk = (c.priority || "").toString().toUpperCase().slice(0, 2);
+    const sk = (c.status || "").toString().toUpperCase().slice(0, 2);
+    const urgency = c.priority ? ({P1:"CRITICAL",P2:"URGENT",P3:"HIGH PRIORITY",P4:"STANDARD"}[pk] || "")
+      : c.status ? ({S1:"URGENT",S2:"NEEDS ATTENTION",S3:"WORKING / ON-SITE",S4:"COMPLETE"}[sk] || "") : "";
+    const ha = c.resolvedAt ? (() => { const p = fmtTZParts(c.resolvedAt); return p.date + " " + p.time; })() : "";
+    lines.push([
+      t.date, t.time, c.property, c.city, c.state, c.name, c.phone,
+      c.callType, c.priority, c.status, urgency, c.priorityReason, c.callerState,
+      c.incident, c.outcome, c.photoRequested, c.resolved ? "Yes" : "No", ha,
+      c.hasRecording ? `${base}/api/recording/${c.messageId}` : "",
+      `${base}/records?id=${encodeURIComponent(c.id)}&date=${t.date}`,
+      c.id,
+    ].map(csv).join(","));
+  }
+  return "\uFEFF" + lines.join("\r\n"); // BOM so Excel reads UTF-8 (accents) correctly
+}
+function reqBase(req) { return (req.headers["x-forwarded-proto"] || req.protocol) + "://" + req.get("host"); }
+
+// CSV export (accountability log). ?scope=today|yesterday|week|pending  OR  ?days=30
+app.get("/api/export.csv", async (req, res) => {
+  if (!PIT || !LOCATION_ID) return res.status(500).json({ error: "Missing GHL_PIT or GHL_LOCATION_ID." });
+  try {
+    const days = req.query.days ? parseInt(req.query.days, 10) : 0;
+    const scope = ["today", "yesterday", "week", "pending"].includes(req.query.scope) ? req.query.scope : "week";
+    const out = await fetchCalls(scope, res, days);
+    if (!out) return;
+    const tag = days ? `${days}d` : scope;
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="margot-call-log-${tag}-${out.date}.csv"`);
+    res.send(callsToCsv(out.calls, reqBase(req)));
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+// ===== RECORDS (evidence) =========================================
+// Optional gate: if RECORDS_PASSWORD is set, require HTTP Basic auth.
+function recordsAuth(req, res, next) {
+  if (!RECORDS_PASSWORD) return next(); // open until a password is configured
+  const h = req.headers.authorization || "";
+  const [scheme, val] = h.split(" ");
+  if (scheme === "Basic" && val) {
+    const dec = Buffer.from(val, "base64").toString();
+    const pass = dec.slice(dec.indexOf(":") + 1);
+    if (pass === RECORDS_PASSWORD) return next();
+  }
+  res.set("WWW-Authenticate", 'Basic realm="Margot Records"');
+  return res.status(401).send("Authentication required.");
+}
+
+// Filtered query across a date range (from/to in TZ), with text/priority/handled filters.
+async function queryCalls({ from, to, q, priority, handled }, res) {
+  const today = ymd(new Date(), TZ);
+  to = to || today;
+  from = from || ymdAddDays(to, -29);
+  const PAGE_SIZE = 50, MAX_PAGES = 20; // ≤1000 most-recent calls (live-API limit; durable store removes this)
+  let raw = [], truncated = false;
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const url = new URL(GHL_BASE + "/voice-ai/dashboard/call-logs");
+    url.searchParams.set("locationId", LOCATION_ID);
+    url.searchParams.set("pageSize", String(PAGE_SIZE));
+    url.searchParams.set("page", String(page));
+    const r = await fetch(url, { headers: ghlHeaders() });
+    if (!r.ok) { res.status(r.status).json({ error: "GHL request failed", status: r.status, detail: await r.text() }); return null; }
+    const data = await r.json();
+    const logs = data.callLogs || [];
+    raw.push(...logs);
+    const oldest = logs[logs.length - 1];
+    if (logs.length < PAGE_SIZE) break;
+    if (oldest && oldest.createdAt && ymd(new Date(oldest.createdAt), TZ) < from) break;
+    if (page === MAX_PAGES) truncated = true;
+  }
+  const resolved = readResolved();
+  let calls = raw
+    .filter((c) => c.agentId === AGENT_ID)
+    .filter((c) => { const d = c.createdAt ? ymd(new Date(c.createdAt), TZ) : null; return d && d >= from && d <= to; })
+    .map((c) => mapCall(c, resolved));
+  if (q) {
+    const needle = q.toLowerCase();
+    calls = calls.filter((c) => [c.property, c.city, c.name, c.incident, c.outcome, c.phone]
+      .filter(Boolean).join(" ").toLowerCase().includes(needle));
+  }
+  if (priority && priority !== "all") {
+    const k = priority.toUpperCase();
+    calls = calls.filter((c) => (c.priority || "").toUpperCase() === k || (c.status || "").toUpperCase() === k);
+  }
+  if (handled === "handled") calls = calls.filter((c) => c.resolved);
+  else if (handled === "unhandled") calls = calls.filter((c) => !c.resolved);
+  calls.sort((a, b) => new Date(b.time || 0) - new Date(a.time || 0));
+  return { from, to, tz: TZ, count: calls.length, truncated, calls };
+}
+
+app.get("/api/records", recordsAuth, async (req, res) => {
+  if (!PIT || !LOCATION_ID) return res.status(500).json({ error: "Missing GHL_PIT or GHL_LOCATION_ID." });
+  try {
+    const out = await queryCalls({
+      from: req.query.from, to: req.query.to, q: req.query.q,
+      priority: req.query.priority, handled: req.query.handled,
+    }, res);
+    if (out) res.json(out);
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+app.get("/api/records.csv", recordsAuth, async (req, res) => {
+  if (!PIT || !LOCATION_ID) return res.status(500).json({ error: "Missing GHL_PIT or GHL_LOCATION_ID." });
+  try {
+    const out = await queryCalls({
+      from: req.query.from, to: req.query.to, q: req.query.q,
+      priority: req.query.priority, handled: req.query.handled,
+    }, res);
+    if (!out) return;
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="margot-records-${out.from}_to_${out.to}.csv"`);
+    res.send(callsToCsv(out.calls, reqBase(req)));
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+app.get("/records", recordsAuth, (_q, res) => res.sendFile(path.join(__dirname, "records.html")));
+// ==================================================================
 
 // Stream the call recording (token stays server-side)
 app.get("/api/recording/:messageId", async (req, res) => {

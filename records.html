@@ -18,6 +18,7 @@
     --brand:#2a64f6; --green:#16a34a;
     --p1:#e5484d; --p2:#f5820b; --p3:#e3b40a; --p4:#22a85a;
     --s1:#e5484d; --s2:#8b3fd6; --s3:#2f6fed; --s4:#22a85a;
+    --su:#8b3fd6;
     --notif:#1b2130;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -143,8 +144,8 @@
 
 <script>
   const PRI={P1:"P1 · CRITICAL",P2:"P2 · URGENT",P3:"P3 · HIGH",P4:"P4 · STANDARD"};
-  const STA={S1:"S1 · URGENT",S2:"S2 · NEEDS ATTENTION",S3:"S3 · WORKING",S4:"S4 · COMPLETE"};
-  const COL={P1:"--p1",P2:"--p2",P3:"--p3",P4:"--p4",S1:"--s1",S2:"--s2",S3:"--s3",S4:"--s4"};
+  const STA={S1:"S1 · URGENT",S2:"S2 · NEEDS ATTENTION",S3:"S3 · WORKING",S4:"S4 · COMPLETE",SU:"🟣 STATUS UPDATE"};
+  const COL={P1:"--p1",P2:"--p2",P3:"--p3",P4:"--p4",S1:"--s1",S2:"--s2",S3:"--s3",S4:"--s4",SU:"--su"};
   let rows=[],pendingOpenId=null;
   const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
   const key=v=>(v||"").toString().toUpperCase().slice(0,2);
@@ -205,6 +206,7 @@
       +kv(internal?"Status":"Priority",cls)
       +kv("Reason",c.priorityReason)+kv("Caller state",c.callerState)
       +kv("Property",[c.property,c.city,c.state].filter(Boolean).join(", "))
+      +kv("Reporter",c.reporterSource)+kv("Status update",c.statusSummary)
       +kv("Their words",c.incident)+kv("Outcome",c.outcome)
       +kv("Photo requested",c.photoRequested==='yes'?'Yes':null)
       +kv("Handled",c.resolved?('Yes'+(c.resolvedAt?' · '+fmtDateTime(c.resolvedAt):'')):'No');
@@ -240,6 +242,7 @@
         ${row("Received",fmtDateTime(c.time))}${row("Caller",c.name)}${row("Phone",c.phone)}${row("Type",c.callType)}
         ${row(internal?"Status":"Priority",cls)}${row("Reason",c.priorityReason)}${row("Caller state",c.callerState)}
         ${row("Property",[c.property,c.city,c.state].filter(Boolean).join(", "))}
+        ${row("Reporter",c.reporterSource)}${row("Status update",c.statusSummary)}
         ${row("Their words",c.incident)}${row("Outcome",c.outcome)}
         ${row("Photo requested",c.photoRequested==='yes'?'Yes':'')}
         ${row("Handled",c.resolved?('Yes'+(c.resolvedAt?' — '+fmtDateTime(c.resolvedAt):'')):'No')}

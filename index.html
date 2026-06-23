@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- VERSION: v1.3.0 (2026-06-15)
+<!-- VERSION: v1.4.0 (2026-06-15)
      CHANGELOG:
+     - v1.4.0  Export CSV button (downloads current scope as accountability call log).
      - v1.3.0  Date scopes: Today / Yesterday / Last 7 days (grouped) / Pending (unhandled backlog).
      - v1.2.0  Re-skin to match EffortlessAI brand (white, electric blue, green, Archivo, wordmark).
      - v1.1.0  Branded notification-format detail sheet (SMS layout, caller-state emoji,
@@ -20,6 +21,7 @@
     --brand:#2a64f6; --green:#16a34a;
     --p1:#e5484d; --p2:#f5820b; --p3:#e3b40a; --p4:#22a85a;
     --s1:#e5484d; --s2:#8b3fd6; --s3:#2f6fed; --s4:#22a85a;
+    --su:#8b3fd6;
     --notif:#1b2130;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -49,10 +51,11 @@
   .chip[data-active="true"]{background:var(--brand);color:#fff;border-color:var(--brand)}
   .chip .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
   .sep{flex:0 0 auto;width:1px;background:var(--line);margin:4px 3px}
-  .sortrow{display:flex;justify-content:space-between;align-items:center;margin-top:11px;gap:10px}
+  .sortrow{display:flex;justify-content:space-between;align-items:center;margin-top:11px;gap:10px;flex-wrap:wrap}
   .count{font-size:.85rem;color:var(--muted);font-weight:600}
   .rightctl{display:flex;align-items:center;gap:14px}
-  .togglebtn,.sortbtn{border:none;background:none;font:inherit;font-weight:700;font-size:.82rem;cursor:pointer;color:var(--brand);display:flex;align-items:center;gap:5px}
+  .togglebtn,.sortbtn,.exportbtn{border:none;background:none;font:inherit;font-weight:700;font-size:.82rem;cursor:pointer;color:var(--brand);display:flex;align-items:center;gap:5px}
+  .exportbtn{font-weight:800}
   .togglebtn{color:var(--muted)}
   .togglebtn[data-on="true"]{color:var(--ink)}
 
@@ -140,6 +143,8 @@
       <div class="sortrow">
         <span class="count" id="count"></span>
         <div class="rightctl">
+          <button class="exportbtn" id="exportbtn">⤓ CSV</button>
+          <button class="sortbtn" id="groupbtn">⊞ By day</button>
           <button class="togglebtn" id="togglebtn" data-on="false">Show handled</button>
           <button class="sortbtn" id="sortbtn">↓ Newest</button>
         </div>
@@ -163,13 +168,13 @@
 
 <script>
   const PRI={P1:{c:"--p1",t:"P1 · CRITICAL"},P2:{c:"--p2",t:"P2 · URGENT"},P3:{c:"--p3",t:"P3 · HIGH"},P4:{c:"--p4",t:"P4 · STANDARD"}};
-  const STA={S1:{c:"--s1",t:"S1 · URGENT"},S2:{c:"--s2",t:"S2 · ASAP"},S3:{c:"--s3",t:"S3 · WORKING"},S4:{c:"--s4",t:"S4 · COMPLETE"}};
+  const STA={S1:{c:"--s1",t:"S1 · URGENT"},S2:{c:"--s2",t:"S2 · ASAP"},S3:{c:"--s3",t:"S3 · WORKING"},S4:{c:"--s4",t:"S4 · COMPLETE"},SU:{c:"--su",t:"🟣 STATUS UPDATE"}};
   const PDOT={P1:"🔴",P2:"🟠",P3:"🟡",P4:"🟢"};
-  const SDOT={S1:"🔴",S2:"🟣",S3:"🔵",S4:"🟢"};
+  const SDOT={S1:"🔴",S2:"🟣",S3:"🔵",S4:"🟢",SU:"🟣"};
   const PFULL={P1:"CRITICAL",P2:"URGENT",P3:"HIGH PRIORITY",P4:"STANDARD"};
-  const SFULL={S1:"URGENT",S2:"NEEDS ATTENTION",S3:"WORKING / ON-SITE",S4:"COMPLETE"};
+  const SFULL={S1:"URGENT",S2:"NEEDS ATTENTION",S3:"WORKING / ON-SITE",S4:"COMPLETE",SU:"STATUS UPDATE"};
   const STATE={Calm:"🟢",Urgent:"🟠",Distressed:"🔴",Agro:"⚡"};
-  let calls=[],filter="all",desc=true,showHandled=false,scope="today",todayStr="";
+  let calls=[],filter="all",desc=true,showHandled=false,scope="today",todayStr="",groupBy="day";
 
   const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
   const fmtTime=t=>{if(!t)return"";const d=new Date(t);return isNaN(d)?"":d.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})};
@@ -192,7 +197,13 @@
   function visible(){
     let rows=calls.filter(c=>showHandled?true:!c.resolved);
     if(filter!=="all")rows=rows.filter(c=>key(c.priority)===filter||key(c.status)===filter);
-    rows.sort((a,b)=>(desc?-1:1)*((new Date(a.time||0))-(new Date(b.time||0))));
+    if(groupBy==="property"){
+      rows.sort((a,b)=>{const pa=(a.property||"~~~").toLowerCase(),pb=(b.property||"~~~").toLowerCase();
+        if(pa<pb)return -1; if(pa>pb)return 1;
+        return (desc?-1:1)*((new Date(a.time||0))-(new Date(b.time||0)));});
+    } else {
+      rows.sort((a,b)=>(desc?-1:1)*((new Date(a.time||0))-(new Date(b.time||0))));
+    }
     return rows;
   }
 
@@ -200,7 +211,7 @@
     const phone=(c.phone||"").replace(/[^0-9+]/g,"");
     const head=c.property||c.name||"Unidentified call";
     const sub=c.property?esc(c.name):(c.callerType?esc(c.callerType):"");
-    const oneLine=c.incident||c.summary||c.outcome||"";
+    const oneLine=c.incident||c.statusSummary||c.summary||c.outcome||"";
     const when=(multiDay?fmtDate(c.time)+" · ":"")+fmtTime(c.time);
     return `<div class="card ${c.resolved?'resolved':''}" data-i="${i}">
       <div class="bar" style="background:${barColor(c)}"></div>
@@ -225,12 +236,18 @@
     const rows=visible();
     document.getElementById("count").textContent=rows.length+(rows.length===1?" call":" calls");
     if(!rows.length){list.innerHTML='<div class="empty">'+(scope==='pending'?'Nothing pending — all caught up.':'No calls in this view.')+'</div>';return;}
+    const byProp=(groupBy==="property");
     const multiDay=(scope==='week'||scope==='pending');
-    const grouped=(scope==='week');
-    let html="",lastDay=null,first=true;
+    const groupedByDay=((scope==='week')&&!byProp);
+    let html="",lastKey=null,first=true;
     rows.forEach((c,i)=>{
-      if(grouped&&c.day!==lastDay){html+=`<div class="daygroup ${first?'first':''}">${dayHeader(c.day)}</div>`;lastDay=c.day;first=false;}
-      html+=cardHTML(c,i,multiDay);
+      if(byProp){
+        const pk=c.property||"Property unspecified";
+        if(pk!==lastKey){html+=`<div class="daygroup ${first?'first':''}">${esc(pk)}</div>`;lastKey=pk;first=false;}
+      } else if(groupedByDay){
+        if(c.day!==lastKey){html+=`<div class="daygroup ${first?'first':''}">${dayHeader(c.day)}</div>`;lastKey=c.day;first=false;}
+      }
+      html+=cardHTML(c,i,multiDay||byProp);
     });
     list.innerHTML=html;
     list.querySelectorAll("[data-open]").forEach(el=>el.addEventListener("click",()=>openSheet(rows[+el.dataset.open])));
@@ -308,6 +325,7 @@
   document.getElementById("chips").addEventListener("click",e=>{const b=e.target.closest(".chip");if(!b)return;
     document.querySelectorAll(".chip").forEach(c=>c.dataset.active="false");b.dataset.active="true";filter=b.dataset.f;render();});
   document.getElementById("sortbtn").addEventListener("click",e=>{desc=!desc;e.currentTarget.textContent=desc?"↓ Newest":"↑ Oldest";render();});
+  document.getElementById("groupbtn").addEventListener("click",e=>{groupBy=(groupBy==="day")?"property":"day";e.currentTarget.textContent=(groupBy==="day")?"⊞ By day":"⊞ By property";render();});
   document.getElementById("togglebtn").addEventListener("click",e=>{showHandled=!showHandled;e.currentTarget.dataset.on=showHandled;e.currentTarget.textContent=showHandled?"Hide handled":"Show handled";render();});
 
   function setDateMeta(d){
@@ -330,6 +348,8 @@
       render();
     }catch(e){document.getElementById("list").innerHTML='<div class="err">Could not reach the server.</div>';}
   }
+
+  document.getElementById("exportbtn").addEventListener("click",()=>{window.location.href="/api/export.csv?scope="+encodeURIComponent(scope);});
 
   document.getElementById("scopes").addEventListener("click",e=>{
     const b=e.target.closest(".scope");if(!b)return;

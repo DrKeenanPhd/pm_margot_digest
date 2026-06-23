@@ -1,5 +1,7 @@
-/* VERSION: v1.5.1  (2026-06-15)
+/* VERSION: v1.6.0  (2026-06-15)
    CHANGELOG:
+   - v1.6.0  Single stamp: priority_level holds P1-P5 or SU (status). Reads property_address for
+   #          headline/grouping (falls back to contact address). Maps reporter_source/status_summary.
    - v1.5.1  CSV "Record Link" column (deep-links to the call's detail on /records).
    - v1.5.0  Records & Evidence: /records + /api/records (date range, address/text search,
    #          priority/handled filters), /api/records.csv, optional RECORDS_PASSWORD gate.
@@ -91,8 +93,12 @@ function abbrevAddress(raw) {
 function mapCall(c, resolved) {
   const ed = c.extractedData || {};
   const idx = indexExtracted(ed);
-  const priority = pick(idx, "priorityLevel", "priority_level");
-  const status = pick(idx, "statusLevel", "status_level");
+  const stamp = pick(idx, "priorityLevel", "priority_level");      // P1–P5 (client) or SU (status)
+  const legacyStatus = pick(idx, "statusLevel", "status_level");   // S1–S4 from older calls
+  const isSU = !!stamp && stamp.toString().trim().toUpperCase().startsWith("SU");
+  const priority = isSU ? null : stamp;
+  const status = isSU ? "SU" : legacyStatus;
+  const propAddr = pick(idx, "propertyAddress", "property_address");
   const name =
     pick(idx, "name") ||
     [pick(idx, "firstName", "callerFirstName"), pick(idx, "lastName", "callerLastName")].filter(Boolean).join(" ") ||
@@ -103,7 +109,7 @@ function mapCall(c, resolved) {
     messageId: c.messageId || null,
     time: c.createdAt || null,
     duration: c.duration || 0,
-    property: abbrevAddress(pick(idx, "address")),
+    property: propAddr ? propAddr.trim() : abbrevAddress(pick(idx, "address")),
     city: pick(idx, "City"),
     state: pick(idx, "State"),
     name: name || "Unidentified caller",
@@ -116,6 +122,8 @@ function mapCall(c, resolved) {
     callerState: pick(idx, "CallerState"),                 // Calm | Urgent | Distressed | Agro
     identifiedAs: pick(idx, "callerSelfIdentifiedAs", "customerSelfIdentifiedAs"),
     jobName: pick(idx, "jobName"),
+    reporterSource: pick(idx, "reporterSource", "reporter_source"),
+    statusSummary: pick(idx, "statusSummary", "status_summary"),
     outcome: pick(idx, "CallOutcome", "callOutcome"),
     incident: pick(idx, "incidentSummary"),
     photoRequested: pick(idx, "photoRequested"),

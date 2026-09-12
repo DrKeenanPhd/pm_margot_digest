@@ -1,5 +1,6 @@
-/* VERSION: v1.6.0  (2026-06-15)
+/* VERSION: v1.7.0  (2026-06-25)
    CHANGELOG:
+   - v1.7.0  Date ranges: This month / This year scopes (+CSV export). Page cap scales for long ranges.
    - v1.6.0  Single stamp: priority_level holds P1-P5 or SU (status). Reads property_address for
    #          headline/grouping (falls back to contact address). Maps reporter_source/status_summary.
    - v1.5.1  CSV "Record Link" column (deep-links to the call's detail on /records).
@@ -155,6 +156,8 @@ function scopeWindow(scope, today) {
   switch (scope) {
     case "yesterday": { const y = ymdAddDays(today, -1); return { from: y, keep: (d) => d === y, asc: false }; }
     case "week":      { const f = ymdAddDays(today, -6); return { from: f, keep: (d) => d >= f && d <= today, asc: false }; }
+    case "month":     { const f = today.slice(0, 8) + "01"; return { from: f, keep: (d) => d >= f && d <= today, asc: false }; }
+    case "year":      { const f = today.slice(0, 5) + "01-01"; return { from: f, keep: (d) => d >= f && d <= today, asc: false }; }
     case "pending":   { const f = ymdAddDays(today, -(PENDING_DAYS - 1)); return { from: f, keep: (d) => d >= f && d <= today, asc: true, unresolvedOnly: true }; }
     case "today":
     default:          return { from: today, keep: (d) => d === today, asc: false };
@@ -169,7 +172,9 @@ async function fetchCalls(scope, res, daysOverride) {
     win = { from, keep: (d) => d >= from && d <= today, asc: false };
   }
   const PAGE_SIZE = 50;        // endpoint hard max
-  const MAX_PAGES = 12;        // safety cap (≤600 most-recent calls)
+  // Safety cap scales with the window. The early-break below stops paging once
+  // the window is covered, so deep caps only page deep when the calls exist.
+  const MAX_PAGES = scope === "year" ? 60 : (scope === "month" || (daysOverride && daysOverride > 31)) ? 30 : 12;
   let raw = [];
   for (let page = 1; page <= MAX_PAGES; page++) {
     const url = new URL(GHL_BASE + "/voice-ai/dashboard/call-logs");
@@ -215,7 +220,7 @@ app.get("/api/debug", async (_q, res) => {
 app.get("/api/calls", async (req, res) => {
   if (!PIT || !LOCATION_ID) return res.status(500).json({ error: "Missing GHL_PIT or GHL_LOCATION_ID." });
   try {
-    const scope = ["today", "yesterday", "week", "pending"].includes(req.query.scope) ? req.query.scope : "today";
+    const scope = ["today", "yesterday", "week", "month", "year", "pending"].includes(req.query.scope) ? req.query.scope : "today";
     const out = await fetchCalls(scope, res);
     if (out) res.json(out);
   } catch (e) { res.status(500).json({ error: String(e) }); }
@@ -265,7 +270,7 @@ app.get("/api/export.csv", async (req, res) => {
   if (!PIT || !LOCATION_ID) return res.status(500).json({ error: "Missing GHL_PIT or GHL_LOCATION_ID." });
   try {
     const days = req.query.days ? parseInt(req.query.days, 10) : 0;
-    const scope = ["today", "yesterday", "week", "pending"].includes(req.query.scope) ? req.query.scope : "week";
+    const scope = ["today", "yesterday", "week", "month", "year", "pending"].includes(req.query.scope) ? req.query.scope : "week";
     const out = await fetchCalls(scope, res, days);
     if (!out) return;
     const tag = days ? `${days}d` : scope;
